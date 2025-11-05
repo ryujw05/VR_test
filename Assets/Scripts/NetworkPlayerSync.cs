@@ -70,35 +70,12 @@ public class NetworkPlayerSync : MonoBehaviour
 
     // JSON 직렬화를 위한 클래스
     [Serializable] class JoinMessage { public string action; public string id; }
-    [System.Serializable] public class Coordinate { public float x; public float y; }
-    [System.Serializable] public class LookAt { public float x; public float y; public float z; }
-    [System.Serializable]
-    public class PosePacket
-    {
-        public Coordinate coordinate;
-        public LookAt look_at;   // 서버가 안 써도 같이 보내는 건 무해
-    }
-    [Serializable] class InLook { public float x, y, z; }
-
-    [Serializable]
-    class InPlayer
-    {
-        public string id;
-        public float x, z;     // CVR 기준 좌표 (x,y,z)
-        public InLook look_at;    // 선택: 없을 수도 있음
-    }
-
-    [Serializable] class InRoot { public InPlayer[] players; }
+    [Serializable] class Coordinate { public float x; public float y; }
+    [Serializable] class CoordinateWrap { public Coordinate coordinate; }
 
     [Serializable] public class PlayerData { public string id; public float x; public float y; }
     [Serializable] public class PlayersRoot { public PlayerData[] players; }
-    [Serializable]
-    class PlayerState
-    {
-        public string id;
-        public float x, y, z;
-        public InLook look_at; // null 가능
-    }
+    [Serializable] class PlayerState { public string id; public float x; public float z; public float ry; }
     [Serializable] class FirstReply { public string player; public string id; }
 
 
@@ -247,34 +224,24 @@ public class NetworkPlayerSync : MonoBehaviour
         {
             try
             {
-                InRoot root = JsonUtility.FromJson<InRoot>(e.Data);
+                // (임시) 기존 players 리스트 포맷 호환 시도
+                PlayersRoot root = JsonUtility.FromJson<PlayersRoot>(e.Data);
                 if (root != null && root.players != null)
                 {
                     if (cLog) CustomLog($"[WS] (main) Parsed {root.players.Length} players.");
                     var list = new List<PlayerState>();
-
-                    foreach (var p in root.players)
-                    {
-                        //if (!renderSelfFromServer && !string.IsNullOrEmpty(myId) && p.id == _phase2Pid) continue; //내 아바타 스킵
-
-                        list.Add(new PlayerState
-                        {
-                            id = p.id,
-                            x = p.x,
-                            z = p.z,
-                            look_at = p.look_at // null 가능
-                        });
-                    }
+                    foreach (var playerData in root.players)
+                        list.Add(new PlayerState { id = playerData.id, x = playerData.x, z = playerData.y, ry = 0f });
                     ApplySnapshot(list);
                     return;
                 }
 
-                // (호환) 만약 옛 포맷이면 여기서 처리하거나 로그만 남김
-                if (cLog) CustomLog("[WS] (main) unrecognized msg: " + e.Data);
+                // 새 서버 state 포맷은 다음 단계에서 파싱 추가
+                if (cLog) CustomLog("[WS] (main) msg: " + e.Data);
             }
             catch (Exception ex)
             {
-                if (cLog) CustomLog("[WS] (main) parse error: " + ex.Message + " | raw=" + e.Data);
+                if (cLog) CustomLog("[WS] (main) parse error: " + ex.Message);
             }
         };
 
@@ -426,6 +393,7 @@ public class NetworkPlayerSync : MonoBehaviour
             if (useCVR)
             {
                 if (!hasCVR) { if (cLog) CustomLog("[CVR] Skip send: not calibrated."); return; }
+                // p_cvr = R(−ψ) * (p_local − O) * s
                 Vector2 cvr = Rot2D((xz - cvrOriginXZ) * cvrScale, -cvrYawRad);
                 localPos = new Vector3(cvr.x, 0f, cvr.y);
             }
@@ -440,17 +408,6 @@ public class NetworkPlayerSync : MonoBehaviour
             return;
         }
 
-        float yawRad = poseProvider.RoomYawDeg * Mathf.Deg2Rad;
-        float pitchRad = poseProvider.RoomPitchDeg * Mathf.Deg2Rad;
-
-        if (useCVR && hasCVR) yawRad -= cvrYawRad;
-
-        Vector3 lookDir = new Vector3(
-            Mathf.Cos(pitchRad) * Mathf.Cos(yawRad),
-            Mathf.Sin(pitchRad),
-            Mathf.Cos(pitchRad) * Mathf.Sin(yawRad)
-        ).normalized;
-
         if ((_lastSentLocalPos - localPos).sqrMagnitude < (minDeltaToSend * minDeltaToSend))
         {
             if (cLog) CustomLog("[SEND DEBUG] Skipped: Movement below threshold.");
@@ -458,12 +415,8 @@ public class NetworkPlayerSync : MonoBehaviour
         }
         _lastSentLocalPos = localPos;
 
-        var pkt = new PosePacket
-        {
-            coordinate = new Coordinate { x = localPos.x, y = localPos.z },  // z→y 매핑 유지
-            look_at = new LookAt { x = lookDir.x, y = lookDir.y, z = lookDir.z }
-        };
-        var json = JsonUtility.ToJson(pkt);
+        var wrap = new CoordinateWrap { coordinate = new Coordinate { x = localPos.x, y = localPos.z } };
+        var json = JsonUtility.ToJson(wrap);
 
         if (cLog) CustomLog($"[SEND DEBUG] Attempting send: {json}");
 
@@ -494,7 +447,7 @@ public class NetworkPlayerSync : MonoBehaviour
 
             if (!agents.TryGetValue(p.id, out var agent) || agent == null || agent.tr == null)
             {
-                if (cLog) CustomLog($"[SYNC] spawn {p.id} @ {world}");
+                if (cLog) CustomLog($"[SYNC DEBUG] Creating NEW avatar for ID: {p.id} at World Pos: {world}");
 
                 Transform tr;
                 if (remoteAvatarPrefab)
