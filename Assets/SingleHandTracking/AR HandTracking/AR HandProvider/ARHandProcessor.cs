@@ -1,14 +1,28 @@
 using MediapipeHandTracking;
 using UnityEngine;
 
-public class ARHandProcessor : MonoBehaviour {
+public class ARHandProcessor : MonoBehaviour
+{
+    public static ARHandProcessor Instance { get; private set; }
     private GameObject Hand = default;
     private HandRect currentHandRect = default;
     private HandRect oldHandRect = default;
     private ARHand currentHand = default;
     private bool isHandRectChange = default;
+    void Awake()
+    {
+        if (Instance == null)
+        {
+            Instance = this;
+        }
+        else
+        {
+            Destroy(gameObject); // 중복 생성 방지
+        }
+    }
 
-    void Start() {
+    void Start()
+    {
         Hand = Manager.instance.HandOnSpace;
         currentHand = new ARHand();
         currentHandRect = new HandRect();
@@ -18,32 +32,40 @@ public class ARHandProcessor : MonoBehaviour {
     /// <summary>
     /// This function is called every fixed framerate frame, if the MonoBehaviour is enabled.
     /// </summary>
-    void FixedUpdate() {
+    void FixedUpdate()
+    {
         if (GetComponent<ARFrameProcessor>().HandProcessor == null) return;
         float[] handRectData = GetComponent<ARFrameProcessor>().HandProcessor.getHandRectData();
         float[] handLandmarksData = GetComponent<ARFrameProcessor>().HandProcessor.getHandLandmarksData();
 
-        if (null != handRectData) {
+        if (null != handRectData)
+        {
             currentHandRect = HandRect.ParseFrom(handRectData);
-            if (!isHandStay()) {
+            if (!isHandStay())
+            {
                 oldHandRect = currentHandRect;
                 isHandRectChange = true;
-            } else {
+            }
+            else
+            {
                 isHandRectChange = false;
             }
         }
 
-        if (null != handLandmarksData && !float.IsNegativeInfinity(GetComponent<ARFrameProcessor>().ImageRatio)) {
+        if (null != handLandmarksData && !float.IsNegativeInfinity(GetComponent<ARFrameProcessor>().ImageRatio))
+        {
             currentHand.ParseFrom(handLandmarksData, GetComponent<ARFrameProcessor>().ImageRatio);
         }
 
         if (!Hand.activeInHierarchy) return;
-        for (int i = 0; i < Hand.transform.childCount; i++) {
+        for (int i = 0; i < Hand.transform.childCount; i++)
+        {
             Hand.transform.GetChild(i).transform.position = currentHand.GetLandmark(i);
         }
     }
 
-    private bool isHandStay() {
+    private bool isHandStay()
+    {
         return currentHandRect.XCenter == oldHandRect.XCenter &&
             currentHandRect.YCenter == oldHandRect.YCenter &&
             currentHandRect.Width == oldHandRect.Width &&

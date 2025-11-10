@@ -151,7 +151,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dc69d545e4f0f3048ba89bba34414ce4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  serverWsUrl: ws://192.168.219.102:8080/ws
+  serverWsUrl: ws://192.168.219.105:8080/ws
   myId: 
   localPlayer: {fileID: 1374127859}
   sharedOrigin: {fileID: 0}
