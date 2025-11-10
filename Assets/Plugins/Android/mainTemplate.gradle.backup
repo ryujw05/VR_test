@@ -48,8 +48,6 @@ dependencies {
 **DEPS**}
 
 android {
-	namespace "com.unity3d.player"
-	ndkPath "**NDKPATH**"
 	aaptOptions {
 		noCompress = ['.ress', '.resource', '.obb'] + unityStreamingAssets.tokenize(', ')
 		ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~"

@@ -70,10 +70,10 @@ public class NetworkPlayerSync : MonoBehaviour
 
     // JSON 직렬화를 위한 클래스
     [Serializable] class JoinMessage { public string action; public string id; }
-    [Serializable] class Coordinate { public float x; public float z; }
+    [Serializable] class Coordinate { public float x; public float y; }
     [Serializable] class CoordinateWrap { public Coordinate coordinate; }
 
-    [Serializable] public class PlayerData { public string id; public float x; public float z; }
+    [Serializable] public class PlayerData { public string id; public float x; public float y; }
     [Serializable] public class PlayersRoot { public PlayerData[] players; }
     [Serializable] class PlayerState { public string id; public float x; public float z; public float ry; }
     [Serializable] class FirstReply { public string player; public string id; }
@@ -231,7 +231,7 @@ public class NetworkPlayerSync : MonoBehaviour
                     if (cLog) CustomLog($"[WS] (main) Parsed {root.players.Length} players.");
                     var list = new List<PlayerState>();
                     foreach (var playerData in root.players)
-                        list.Add(new PlayerState { id = playerData.id, x = playerData.x, z = playerData.z, ry = 0f });
+                        list.Add(new PlayerState { id = playerData.id, x = playerData.x, z = playerData.y, ry = 0f });
                     ApplySnapshot(list);
                     return;
                 }
@@ -415,7 +415,7 @@ public class NetworkPlayerSync : MonoBehaviour
         }
         _lastSentLocalPos = localPos;
 
-        var wrap = new CoordinateWrap { coordinate = new Coordinate { x = localPos.x, z = localPos.z } };
+        var wrap = new CoordinateWrap { coordinate = new Coordinate { x = localPos.x, y = localPos.z } };
         var json = JsonUtility.ToJson(wrap);
 
         if (cLog) CustomLog($"[SEND DEBUG] Attempting send: {json}");
