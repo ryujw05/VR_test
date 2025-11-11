@@ -31,6 +31,13 @@ public class RoomPoseDisplay : MonoBehaviour
     public float RoomYawDeg { get; private set; }
     public float RoomPitchDeg { get; private set; }
 
+    public bool TryWorldToRoom(Vector3 worldPos, out Vector3 roomPos)
+    {
+        roomPos = worldPos;
+        if (!HasRoomLock || roomRef == null) return false;      // 아직 [Fix] 전이면 변환 불가
+        roomPos = roomRef.InverseTransformPoint(worldPos);
+        return true;
+    }
 
     void Awake()
     {

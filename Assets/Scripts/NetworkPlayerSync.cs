@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using UnityEngine;
 using TMPro; // TextMeshPro를 사용하려면 필요합니다.
+using UnityEngine;
+using UnityEngine.XR;
 using WS = WebSocketSharp;
 
 public class NetworkPlayerSync : MonoBehaviour
@@ -33,6 +34,9 @@ public class NetworkPlayerSync : MonoBehaviour
     [Tooltip("내 아바타를 서버 스냅샷으로도 렌더링할지 (false면 내 ID는 스킵)")]
     public bool renderSelfFromServer = false;
 
+    [Header("Hand Tracking (optional)")]
+    public HandPoseProvider handProvider;   // 월드 기준 손 좌표
+    public bool includeHand = true;
 
     [Header("UI Debug")]
     [Tooltip("로그 출력을 위한 TextMeshPro 컴포넌트")]
@@ -69,13 +73,13 @@ public class NetworkPlayerSync : MonoBehaviour
     private string _phase2Pid = "";        // 현재 세션의 player (p1/p2…)
 
     // JSON 직렬화를 위한 클래스
-    [Serializable] class JoinMessage { public string action; public string id; }
-    [Serializable] class Coordinate { public float x; public float y; }
-    [Serializable] class CoordinateWrap { public Coordinate coordinate; }
+    [Serializable] class Coordinate { public float x; public float z; }
+    [Serializable] public class Hand { public float x, y, z; public Hand() { } public Hand(Vector3 v) { x = v.x; y = v.y; z = v.z; } }
+    [Serializable] class CoordinateWrap { public Coordinate coordinate; public Hand hand; }
 
-    [Serializable] public class PlayerData { public string id; public float x; public float y; }
+    [Serializable] public class PlayerData { public string id; public float x; public float z; public Hand hand; } // hand 추가
     [Serializable] public class PlayersRoot { public PlayerData[] players; }
-    [Serializable] class PlayerState { public string id; public float x; public float z; public float ry; }
+
     [Serializable] class FirstReply { public string player; public string id; }
 
 
@@ -105,17 +109,16 @@ public class NetworkPlayerSync : MonoBehaviour
         ConnectToServer(null);
     }
 
-    // ===== 1. 접속 (내부 자동 호출) =====
+    // ===== 1) 접속 (내부 자동 호출) =====
     public void ConnectToServer(string ignoredPlayerId)
     {
         try
         {
-            // baseUrl 추출 (기존 serverWsUrl이 ".../ws" 라고 가정)
             string baseUrl = serverWsUrl;
             if (baseUrl.EndsWith("/ws"))
                 baseUrl = baseUrl.Substring(0, baseUrl.Length - 3); // "/ws" 제거
 
-            // ① Resume: 저장된 pid가 있으면 곧장 /ws/{pid}로 붙어본다
+            // ① Resume: 저장된 pid가 있으면 바로 /ws/{pid} 시도
             string savedPid = PlayerPrefs.GetString(PREF_PID, "");
             string savedUid = PlayerPrefs.GetString(PREF_UID, "");
 
@@ -126,11 +129,11 @@ public class NetworkPlayerSync : MonoBehaviour
 
                 string url2 = baseUrl + "/ws/" + _phase2Pid;
                 if (cLog) CustomLog($"[WS] (resume) try {url2}  pid={_phase2Pid}, uid={myId}");
-                if (TryConnectMain(url2)) return;   // 붙기만 하면 끝(성공)
+                if (TryConnectMain(url2)) return;   // 성공하면 끝
                 if (cLog) CustomLog("[WS] (resume) failed → fallback to phase1");
             }
 
-            // ② Phase1: /ws 에 연결 → {"name": "..."} 보내고 → {"player","id"} 받기
+            // ② Phase1: /ws로 접속해서 {player,id} 발급
             Phase1_Handshake(baseUrl);
         }
         catch (Exception ex)
@@ -139,14 +142,12 @@ public class NetworkPlayerSync : MonoBehaviour
         }
     }
 
+    // ===== 2) Phase1: /ws 에서 pid/uid 발급 =====
     private void Phase1_Handshake(string baseUrl)
     {
-        // 안전: 기존 열려있던 소켓 종료
-        if (ws != null)
-        {
-            try { ws.Close(); } catch { }
-            ws = null;
-        }
+        // 안전: 기존 소켓 닫기
+        try { ws?.Close(); } catch { }
+        ws = null;
 
         string phase1Url = baseUrl + "/ws";
         ws = new WS.WebSocket(phase1Url);
@@ -154,7 +155,7 @@ public class NetworkPlayerSync : MonoBehaviour
         ws.OnOpen += (s, e) =>
         {
             if (cLog) CustomLog($"[WS] (phase1) connected: {phase1Url}");
-            // 연결 즉시 {"name": "..."} 전송
+            // 연결 즉시 {"name": "..."} 전송 (선택)
             string displayName = SystemInfo.deviceName;
             string hello = "{\"name\":\"" + displayName + "\"}";
             try { ws.Send(hello); if (cLog) CustomLog("[WS] (phase1) sent hello: " + hello); }
@@ -165,20 +166,21 @@ public class NetworkPlayerSync : MonoBehaviour
         {
             try
             {
-                // 기대: {"player":"p1","id":"<uid>"}
+                // 서버 기대: {"player":"p1","id":"<uid>"}
                 FirstReply fr = JsonUtility.FromJson<FirstReply>(e.Data);
                 if (fr != null && !string.IsNullOrEmpty(fr.player) && !string.IsNullOrEmpty(fr.id))
                 {
                     _phase2Pid = fr.player;
                     myId = fr.id;
+                    myPid = _phase2Pid; // ★ 내 pid 저장
                     if (cLog) CustomLog($"[WS] (phase1) assigned: player={_phase2Pid}, uid={myId}");
 
-                    // 영구 저장 → 이후 재접속 시 resume 경로 사용
+                    // 영구 저장 → 다음부터 resume 경로 사용
                     PlayerPrefs.SetString(PREF_PID, _phase2Pid);
                     PlayerPrefs.SetString(PREF_UID, myId);
                     PlayerPrefs.Save();
 
-                    // /ws 닫고 /ws/{pid} 로 본채널 연결
+                    // /ws 닫고 /ws/{pid} 접속
                     try { ws.Close(); } catch { }
                     string phase2Url = baseUrl + "/ws/" + _phase2Pid;
                     ConnectToMainChannel(phase2Url);
@@ -202,41 +204,33 @@ public class NetworkPlayerSync : MonoBehaviour
         ws.Connect();
     }
 
+    // ===== 3) 본 채널: /ws/{pid} =====
     private void ConnectToMainChannel(string url)
     {
-        // 안전: 기존 열려있던 소켓 종료
-        if (ws != null)
-        {
-            try { ws.Close(); } catch { }
-            ws = null;
-        }
+        // 안전: 기존 소켓 닫기
+        try { ws?.Close(); } catch { }
+        ws = null;
 
         ws = new WS.WebSocket(url);
 
         ws.OnOpen += (s, e) =>
         {
             if (cLog) CustomLog($"[WS] (main) connected: {url}");
-            // 이 채널에서는 RequestSync() 호출로 syncStarted를 켜서 전송 루프 시작
-            // (룸고정 → CalibrateCVR → RequestSync 순서로 호출되는 기존 흐름 유지)
+            // 자동 시작이 필요하면 한 줄 추가 (원치 않으면 주석)
+            // RequestSync();
         };
 
         ws.OnMessage += (s, e) =>
         {
             try
             {
-                // (임시) 기존 players 리스트 포맷 호환 시도
+                // 서버 응답: {"players":[{ "id","x","z","hand":{x,y,z}? }]}
                 PlayersRoot root = JsonUtility.FromJson<PlayersRoot>(e.Data);
                 if (root != null && root.players != null)
                 {
-                    if (cLog) CustomLog($"[WS] (main) Parsed {root.players.Length} players.");
-                    var list = new List<PlayerState>();
-                    foreach (var playerData in root.players)
-                        list.Add(new PlayerState { id = playerData.id, x = playerData.x, z = playerData.y, ry = 0f });
-                    ApplySnapshot(list);
+                    ApplySnapshot(root.players);
                     return;
                 }
-
-                // 새 서버 state 포맷은 다음 단계에서 파싱 추가
                 if (cLog) CustomLog("[WS] (main) msg: " + e.Data);
             }
             catch (Exception ex)
@@ -249,7 +243,6 @@ public class NetworkPlayerSync : MonoBehaviour
         ws.OnClose += (s, e) =>
         {
             if (cLog) CustomLog($"[WS] (main) closed. Code:{e.Code}, Reason:{e.Reason}");
-            // 연결이 닫혀도 PlayerPrefs는 유지 → 다음엔 resume 먼저 시도됨
         };
 
         try
@@ -263,6 +256,7 @@ public class NetworkPlayerSync : MonoBehaviour
         }
     }
 
+    // ===== 4) 재개(resume) 시도: /ws/{pid} 바로 붙기 =====
     private bool TryConnectMain(string url)
     {
         bool opened = false;
@@ -271,30 +265,22 @@ public class NetworkPlayerSync : MonoBehaviour
         temp.OnOpen += (s, e) => { opened = true; if (cLog) CustomLog($"[WS] (resume) opened: {url}"); };
         temp.OnError += (s, e) => { if (cLog) CustomLog($"[WS] (resume) ERROR: {e?.Message ?? "(null)"}"); };
         temp.OnClose += (s, e) => { if (cLog) CustomLog($"[WS] (resume) closed: {e.Code}"); };
-        temp.OnMessage += (s, e) =>
-        {
-            // 필요시 여기서 첫 메시지를 검사해도 됨. 이번엔 단순 성공만 본다.
-            if (cLog) CustomLog("[WS] (resume) msg: " + e.Data);
-        };
+        temp.OnMessage += (s, e) => { if (cLog) CustomLog("[WS] (resume) msg: " + e.Data); };
 
         try { temp.Connect(); }
         catch (Exception ex) { if (cLog) CustomLog($"[WS] (resume) Connect EX: {ex.Message}"); }
 
         if (opened)
         {
-            // 성공 → 기존 ws를 temp로 교체
             try { ws?.Close(); } catch { }
             ws = temp;
+            myPid = _phase2Pid; // ★ resume 성공 시 내 pid 유지
             return true;
         }
 
-        // 실패 → 소켓 정리
         try { temp.Close(); } catch { }
         return false;
     }
-
-
-
 
     private void OnApplicationQuit() { ws?.Close(); }
     private void OnDestroy() { ws?.Close(); }
@@ -408,6 +394,29 @@ public class NetworkPlayerSync : MonoBehaviour
             return;
         }
 
+        Vector3? handOut = null;
+
+        if (includeHand && handProvider != null && poseProvider != null && poseProvider.HasRoomLock)
+        {
+            if (handProvider.TryGetHandWorld(out var handWorld))
+            {
+                Vector3 handRoom; // ← 미리 선언
+                if (poseProvider.TryWorldToRoom(handWorld, out handRoom))
+                {
+                    if (useCVR && hasCVR)
+                    {
+                        Vector2 hxz = new Vector2(handRoom.x, handRoom.z);
+                        Vector2 hcvr = Rot2D((hxz - cvrOriginXZ) * cvrScale, -cvrYawRad);
+                        handOut = new Vector3(hcvr.x, handRoom.y, hcvr.y);
+                    }
+                    else
+                    {
+                        handOut = handRoom;
+                    }
+                }
+            }
+        }
+
         if ((_lastSentLocalPos - localPos).sqrMagnitude < (minDeltaToSend * minDeltaToSend))
         {
             if (cLog) CustomLog("[SEND DEBUG] Skipped: Movement below threshold.");
@@ -415,7 +424,11 @@ public class NetworkPlayerSync : MonoBehaviour
         }
         _lastSentLocalPos = localPos;
 
-        var wrap = new CoordinateWrap { coordinate = new Coordinate { x = localPos.x, y = localPos.z } };
+        var wrap = new CoordinateWrap
+        {
+            coordinate = new Coordinate { x = localPos.x, z = localPos.z },
+            hand = handOut.HasValue ? new Hand(handOut.Value) : null
+        };
         var json = JsonUtility.ToJson(wrap);
 
         if (cLog) CustomLog($"[SEND DEBUG] Attempting send: {json}");
@@ -431,7 +444,7 @@ public class NetworkPlayerSync : MonoBehaviour
     }
 
     // ===== 5. 수신 스냅샷 적용 로직 =====
-    private void ApplySnapshot(List<PlayerState> players)
+    private void ApplySnapshot(IEnumerable<PlayerData> players)
     {
         var seen = new HashSet<string>();
 
