@@ -1914,9 +1914,9 @@ MonoBehaviour:
   confirmButton: {fileID: 1666751924}
   messageText: {fileID: 473841790}
   debugText: {fileID: 1137282230}
-  roomMaterial: {fileID: 2100000, guid: c7dc883281ffc3e4ebd7dbb8e03511ee, type: 2}
+  roomMaterial: {fileID: 2100000, guid: 2e353e57f9bb6d04e992760e41bf9918, type: 2}
   anchorManager: {fileID: 1820004676}
-  roomSizeMeters: 1
+  roomSizeMeters: 3
   cameraLensOffset: 0.02
   onRoomFixed:
     m_PersistentCalls:

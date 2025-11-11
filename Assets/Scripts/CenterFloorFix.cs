@@ -16,7 +16,7 @@ public class FloorRoomStateMachine : MonoBehaviour
     public ARAnchorManager anchorManager;// XR Originø° ∫Ÿ¿∫ ARAnchorManager
 
     [Header("Room Settings")]
-    public float roomSizeMeters = 1f;       // Cube edge length
+    public float roomSizeMeters = 3f;       // Cube edge length
     public float cameraLensOffset = 0.02f;  // Lens height offset when phone is on the floor
     public UnityEvent<Transform> onRoomFixed;
 
