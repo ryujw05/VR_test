@@ -15,6 +15,9 @@ public class FloorRoomStateMachine : MonoBehaviour
     public Material roomMaterial;        // Visual material (transparent recommended)
     public ARAnchorManager anchorManager;// XR Origin에 붙은 ARAnchorManager
 
+    [Header("AR Plane")]
+    [SerializeField] private ARPlaneManager planeManager;
+
     [Header("Room Settings")]
     public float roomSizeMeters = 3f;       // Cube edge length
     public float cameraLensOffset = 0.02f;  // Lens height offset when phone is on the floor
@@ -120,7 +123,14 @@ public class FloorRoomStateMachine : MonoBehaviour
         Vector3 camPos = arCamera.transform.position;
         //float floorY = camPos.y - Mathf.Clamp(cameraLensOffset, 0f, 0.05f);
         //lockedCenter = new Vector3(camPos.x, floorY, camPos.z);
-        lockedCenter = camPos;
+        float floorY;
+        if (!TryGetFloorY(out floorY))
+        {
+            // 실패하면 fallback으로 옛날 방식 쓰거나, 메시지 띄우고 return
+            floorY = camPos.y - Mathf.Clamp(cameraLensOffset, 0f, 0.05f);
+        }
+
+        lockedCenter = new Vector3(camPos.x, floorY, camPos.z);
 
         // Lock yaw
         lockedYawDeg = arCamera.transform.eulerAngles.y;
@@ -225,7 +235,7 @@ public class FloorRoomStateMachine : MonoBehaviour
         var edgesRoot = new GameObject("CubeEdges");
         edgesRoot.transform.SetParent(cube, false);
 
-        float h = size * 0.5f; // half extent
+        float h = 0.5f; // half extent
 
         // 8개 코너 (로컬좌표, 부모의 스케일을 따름)
         Vector3[] v = new Vector3[]
@@ -288,5 +298,30 @@ public class FloorRoomStateMachine : MonoBehaviour
             lr.sortingOrder = 1000;                // 투명 머티리얼 위에 보이도록 약간 높은 정렬 순서
         }
     }
+
+    private bool TryGetFloorY(out float floorY)
+    {
+        floorY = 0f;
+        if (planeManager == null) return false;
+
+        float minY = float.PositiveInfinity;
+        foreach (var plane in planeManager.trackables)
+        {
+            // 수평 아래를 향하는 plane만 필터링
+            var n = plane.transform.up;
+            if (Vector3.Dot(n, Vector3.up) < 0.9f) continue;
+
+            float y = plane.transform.position.y;
+            if (y < minY) minY = y;
+        }
+
+        if (minY < float.PositiveInfinity)
+        {
+            floorY = minY;
+            return true;
+        }
+        return false;
+    }
+
 
 }

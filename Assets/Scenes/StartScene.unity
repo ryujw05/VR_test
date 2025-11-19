@@ -1917,6 +1917,7 @@ MonoBehaviour:
   debugText: {fileID: 1137282230}
   roomMaterial: {fileID: 2100000, guid: 2e353e57f9bb6d04e992760e41bf9918, type: 2}
   anchorManager: {fileID: 1820004676}
+  planeManager: {fileID: 1820004677}
   roomSizeMeters: 3
   cameraLensOffset: 0.02
   onRoomFixed:
@@ -1966,6 +1967,7 @@ GameObject:
   - component: {fileID: 1820004675}
   - component: {fileID: 1820004674}
   - component: {fileID: 1820004676}
+  - component: {fileID: 1820004677}
   m_Layer: 0
   m_Name: XR Origin
   m_TagString: Untagged
@@ -2019,6 +2021,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_AnchorPrefab: {fileID: 0}
+--- !u!114 &1820004677
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1820004673}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e1760703bbd54c04488a8d10600262ab, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_PlanePrefab: {fileID: 0}
+  m_DetectionMode: -1
 --- !u!1 &1923722716
 GameObject:
   m_ObjectHideFlags: 0
