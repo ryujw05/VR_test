@@ -1,32 +1,32 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using TMPro;
 using UnityEngine.XR.ARFoundation;
 
 public class RoomPoseDisplay : MonoBehaviour
 {
     [Header("References")]
-    public Camera arCamera;          // AR Ä«¸Þ¶ó (¾øÀ¸¸é Camera.main »ç¿ë)
-    public TMP_Text debugText;       // Ãâ·Â¿ë ÅØ½ºÆ® (¼±ÅÃ)
+    public Camera arCamera;          // AR Ä«ï¿½Þ¶ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Camera.main ï¿½ï¿½ï¿½)
+    public TMP_Text debugText;       // ï¿½ï¿½Â¿ï¿½ ï¿½Ø½ï¿½Æ® (ï¿½ï¿½ï¿½ï¿½)
 
     [Header("Options")]
     [Range(0f, 0.9f)]
-    public float smooth = 0.2f;      // 0=Áï½Ã, 1¿¡ °¡±î¿ï¼ö·Ï ´õ ºÎµå·´°Ô
-    public bool useGyroFallback = true; // Æ®·¡Å· »ó½Ç ½Ã ÀÚÀÌ·Î·Î yaw ÀÓ½Ã º¸¿Ï
+    public float smooth = 0.2f;      // 0=ï¿½ï¿½ï¿½, 1ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Îµå·´ï¿½ï¿½
+    public bool useGyroFallback = true; // Æ®ï¿½ï¿½Å· ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½Ì·Î·ï¿½ yaw ï¿½Ó½ï¿½ ï¿½ï¿½ï¿½ï¿½
 
-    // ³»ºÎ »óÅÂ
-    private Transform roomRef;       // ±âÁØ ÁÂÇ¥°è(= RoomAnchor ¿ì¼±, ¾øÀ¸¸é GameRoom)
-    private Vector2 lastStableXZ;    // ¸¶Áö¸· ¾ÈÁ¤ XZ (room-space)
-    private float lastStableYawDeg;  // ¸¶Áö¸· ¾ÈÁ¤ yaw (deg, room-space)
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+    private Transform roomRef;       // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ç¥ï¿½ï¿½(= RoomAnchor ï¿½ì¼±, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ GameRoom)
+    private Vector2 lastStableXZ;    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ XZ (room-space)
+    private float lastStableYawDeg;  // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ yaw (deg, room-space)
     private bool gyroSupported;
     private float gyroYawDeg;
 
     // RoomPoseDisplay.cs
-    public void SetRoomRef(Transform t) { roomRef = t; }  // roomRef´Â RPS ³»ºÎ ÇÊµå
+    public void SetRoomRef(Transform t) { roomRef = t; }  // roomRefï¿½ï¿½ RPS ï¿½ï¿½ï¿½ï¿½ ï¿½Êµï¿½
 
-    // RoomPoseDisplay.cs (Å¬·¡½º ³»ºÎ ¾îµðµç)
+    // RoomPoseDisplay.cs (Å¬ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
     public bool HasRoomLock => roomRef != null;
 
-    // ÃÖ±Ù °è»êµÈ room-space Æ÷Áî¸¦ ¿ÜºÎ¿¡ Á¦°ø
+    // ï¿½Ö±ï¿½ ï¿½ï¿½ï¿½ï¿½ room-space ï¿½ï¿½ï¿½î¸¦ ï¿½ÜºÎ¿ï¿½ ï¿½ï¿½ï¿½ï¿½
     public Vector2 RoomXZ { get; private set; }
     public float RoomYawDeg { get; private set; }
     public float RoomPitchDeg { get; private set; }
@@ -34,7 +34,7 @@ public class RoomPoseDisplay : MonoBehaviour
     public bool TryWorldToRoom(Vector3 worldPos, out Vector3 roomPos)
     {
         roomPos = worldPos;
-        if (!HasRoomLock || roomRef == null) return false;      // ¾ÆÁ÷ [Fix] ÀüÀÌ¸é º¯È¯ ºÒ°¡
+        if (!HasRoomLock || roomRef == null) return false;      // ï¿½ï¿½ï¿½ï¿½ [Fix] ï¿½ï¿½ï¿½Ì¸ï¿½ ï¿½ï¿½È¯ ï¿½Ò°ï¿½
         roomPos = roomRef.InverseTransformPoint(worldPos);
         return true;
     }
@@ -48,7 +48,7 @@ public class RoomPoseDisplay : MonoBehaviour
 
     void Update()
     {
-        // 1) ±âÁØ ÁÂÇ¥°è È®º¸ (¿øº» ½ºÅ©¸³Æ® ¼öÁ¤ ¾øÀÌ ÀÚµ¿ Å½»ö)
+        // 1) ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ç¥ï¿½ï¿½ È®ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Å©ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Úµï¿½ Å½ï¿½ï¿½)
         if (roomRef == null)
         {
             var anchorGO = GameObject.Find("RoomAnchor");
@@ -61,7 +61,7 @@ public class RoomPoseDisplay : MonoBehaviour
 
             if (roomRef == null)
             {
-                // ¾ÆÁ÷ [Fix] ÀüÀÌ°Å³ª »ý¼º ÀüÀÎ »óÅÂ
+                // ï¿½ï¿½ï¿½ï¿½ [Fix] ï¿½ï¿½ï¿½Ì°Å³ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
                 if (debugText)
                     debugText.text = "Waiting for room lock... (Press [Fix])";
                 return;
@@ -70,7 +70,7 @@ public class RoomPoseDisplay : MonoBehaviour
 
         if (arCamera == null) return;
 
-        // 2) ·ë ±âÁØ Æ÷Áî °è»ê
+        // 2) ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
         Vector3 localPos = roomRef.InverseTransformPoint(arCamera.transform.position);
         Quaternion localRot = Quaternion.Inverse(roomRef.rotation) * arCamera.transform.rotation;
 
@@ -82,14 +82,14 @@ public class RoomPoseDisplay : MonoBehaviour
 
         if (!trackingGood)
         {
-            // XZ´Â ¸¶Áö¸· ¾ÈÁ¤°ª À¯Áö
+            // XZï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             xz = lastStableXZ;
 
-            // yaw´Â ÀÚÀÌ·Î·Î ÀÓ½Ã º¸¿Ï(°¡´É/¿É¼ÇÀÏ ¶§)
+            // yawï¿½ï¿½ ï¿½ï¿½ï¿½Ì·Î·ï¿½ ï¿½Ó½ï¿½ ï¿½ï¿½ï¿½ï¿½(ï¿½ï¿½ï¿½ï¿½/ï¿½É¼ï¿½ï¿½ï¿½ ï¿½ï¿½)
             if (useGyroFallback && gyroSupported)
             {
                 Quaternion att = Input.gyro.attitude;
-                // ÇÃ·§Æû ÁÂÇ¥°è °£´Ü º¸Á¤
+                // ï¿½Ã·ï¿½ï¿½ï¿½ ï¿½ï¿½Ç¥ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
                 Quaternion q = new Quaternion(att.x, att.y, -att.z, -att.w);
                 Vector3 eul = q.eulerAngles;
                 gyroYawDeg = Normalize360(eul.y);
@@ -102,16 +102,16 @@ public class RoomPoseDisplay : MonoBehaviour
         }
         else
         {
-            // Æ®·¡Å· Á¤»ó: ÇöÀç °ªÀ» ¾ÈÁ¤°ªÀ¸·Î °»½Å
+            // Æ®ï¿½ï¿½Å· ï¿½ï¿½ï¿½ï¿½: ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             lastStableXZ = xz;
             lastStableYawDeg = yawDeg;
         }
 
-        // 3) ½º¹«µù
+        // 3) ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         Vector2 smXZ = Vector2.Lerp(lastStableXZ, xz, 1f - smooth);
         float smYaw = Mathf.LerpAngle(lastStableYawDeg, yawDeg, 1f - smooth);
 
-        // 4) Ãâ·Â
+        // 4) ï¿½ï¿½ï¿½
         if (debugText)
         {
             string trackStr = trackingGood
@@ -119,15 +119,15 @@ public class RoomPoseDisplay : MonoBehaviour
                 : (useGyroFallback && gyroSupported ? "TRACK LOST (XZ frozen, yaw by gyro)" : "TRACK LOST (holding last)");
             debugText.text =
                 $"room-space x/z (m): {smXZ.x,6:0.00} / {smXZ.y,6:0.00}\n" +
-                $"room-space yaw (¡Æ): {Normalize360(smYaw),6:0.0}   {trackStr}";
+                $"room-space yaw (ï¿½ï¿½): {Normalize360(smYaw),6:0.0}   {trackStr}";
         }
-        // Update() ¸»¹ÌÀÇ Ãâ·Â Á÷Àü/Á÷ÈÄ µî ÀûÀýÇÑ À§Ä¡¿¡ Ãß°¡
+        // Update() ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½ß°ï¿½
         RoomXZ = smXZ;          // room-space XZ (meters)
         RoomYawDeg = smYaw;     // room-space yaw (degrees)
         RoomPitchDeg = pitchDeg;
     }
 
-    // ===== À¯Æ¿ =====
+    // ===== ï¿½ï¿½Æ¿ =====
     static float Normalize360(float y)
     {
         y %= 360f;

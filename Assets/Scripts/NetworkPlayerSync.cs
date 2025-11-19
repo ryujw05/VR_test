@@ -8,7 +8,7 @@ using WS = WebSocketSharp;
 public class NetworkPlayerSync : MonoBehaviour
 {
     [Header("Connection")]
-    public string serverWsUrl = "ws://192.168.219.105:8080/ws";
+    public string serverWsUrl = "ws://192.168.219.102:8080/ws";
     [HideInInspector]
     public string myId = "";
 
@@ -218,6 +218,8 @@ public class NetworkPlayerSync : MonoBehaviour
             if (cLog) CustomLog($"[WS] (main) connected: {url}");
             // 자동 시작이 필요하면 한 줄 추가 (원치 않으면 주석)
             // RequestSync();
+            syncStarted = true;
+            _lastSentLocalPos = Vector3.positiveInfinity;
         };
 
         ws.OnMessage += (s, e) =>
@@ -417,12 +419,13 @@ public class NetworkPlayerSync : MonoBehaviour
             }
         }
 
-        if ((_lastSentLocalPos - localPos).sqrMagnitude < (minDeltaToSend * minDeltaToSend))
-        {
-            if (cLog) CustomLog("[SEND DEBUG] Skipped: Movement below threshold.");
-            return;
-        }
-        _lastSentLocalPos = localPos;
+        //11.20.01.43 틱 주기 확인용
+        //if ((_lastSentLocalPos - localPos).sqrMagnitude < (minDeltaToSend * minDeltaToSend))
+        //{
+        //    if (cLog) CustomLog("[SEND DEBUG] Skipped: Movement below threshold.");
+        //    return;
+        //}
+        //_lastSentLocalPos = localPos;
 
         var wrap = new CoordinateWrap
         {
