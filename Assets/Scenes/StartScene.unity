@@ -188,6 +188,7 @@ MonoBehaviour:
   localPlayer: {fileID: 1374127859}
   sharedOrigin: {fileID: 0}
   remoteAvatarPrefab: {fileID: 7090174630405191453, guid: 3f416f1621e26304c93cf62f51abcb20, type: 3}
+  remoteHandPrefab: {fileID: 7090174630405191453, guid: b3250d29b3a0ca84faeb6c2a7bdf1b37, type: 3}
   sendHz: 15
   moveLerp: 12
   rotLerp: 12
@@ -195,6 +196,8 @@ MonoBehaviour:
   useCVR: 1
   requireCalibToSync: 1
   renderSelfFromServer: 0
+  handProvider: {fileID: 896428750}
+  includeHand: 1
   debugLogText: {fileID: 834294638}
   poseProvider: {fileID: 1715168356}
 --- !u!4 &386739695

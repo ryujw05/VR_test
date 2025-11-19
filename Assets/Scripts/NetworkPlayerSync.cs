@@ -16,6 +16,7 @@ public class NetworkPlayerSync : MonoBehaviour
     public Transform localPlayer;
     public Transform sharedOrigin;
     public GameObject remoteAvatarPrefab;
+    public GameObject remoteHandPrefab;
 
     [Header("Sync Settings")]
     [Range(5, 30)] public int sendHz = 15;
@@ -458,8 +459,19 @@ public class NetworkPlayerSync : MonoBehaviour
             if (string.IsNullOrEmpty(p.id)) continue;
             seen.Add(p.id);
 
+            // body
             Vector3 world = new Vector3(p.x, 0f, p.z);
             Quaternion rot = Quaternion.identity;
+
+            // 손 위치 (서버에서 hand 필드로 오는 값 그대로 사용)
+            bool hasHand = (p.hand != null);
+            Vector3 handWorld = Vector3.zero;
+            Quaternion handRot = Quaternion.identity;
+
+            if (hasHand)
+            {
+                handWorld = new Vector3(p.hand.x, p.hand.y, p.hand.z);
+            }
 
             if (!agents.TryGetValue(p.id, out var agent) || agent == null || agent.tr == null)
             {
@@ -477,7 +489,16 @@ public class NetworkPlayerSync : MonoBehaviour
                     go.transform.localScale = Vector3.one * 0.2f;
                     tr = go.transform;
                 }
-                agent = new RemoteAgent(tr);
+
+                //hand prefab
+                Transform handTr = null;
+                if (remoteHandPrefab && hasHand)
+                {
+                    handTr = Instantiate(remoteHandPrefab, handWorld, handRot).transform;
+                    handTr.name = $"Remote_{p.id}_Hand";
+                }
+
+                agent = new RemoteAgent(tr, handTr);
                 agents[p.id] = agent;
             }
             else
@@ -487,6 +508,12 @@ public class NetworkPlayerSync : MonoBehaviour
 
             agent.targetPos = world;
             agent.targetRot = rot;
+
+            if (hasHand)
+            {
+                agent.targetHandPos = handWorld;
+                agent.targetHandRot = handRot;
+            }
         }
 
         //    — 유령 잔상 방지
@@ -496,7 +523,14 @@ public class NetworkPlayerSync : MonoBehaviour
 
         foreach (var id in toRemove)
         {
-            if (agents[id]?.tr) Destroy(agents[id].tr.gameObject);
+            if (agents[id] != null)
+            {
+                if (agents[id].tr)
+                    Destroy(agents[id].tr.gameObject);
+
+                if (agents[id].handTr)
+                    Destroy(agents[id].handTr.gameObject);
+            }
             agents.Remove(id);
         }
     }
@@ -505,14 +539,27 @@ public class NetworkPlayerSync : MonoBehaviour
     private class RemoteAgent
     {
         public Transform tr;
+        public Transform handTr;
+
         public Vector3 targetPos;
         public Quaternion targetRot;
 
-        public RemoteAgent(Transform t)
+        public Vector3 targetHandPos;
+        public Quaternion targetHandRot;
+
+        public RemoteAgent(Transform t, Transform th)
         {
             tr = t;
             targetPos = t.position;
             targetRot = t.rotation;
+
+            handTr = th;
+
+            if (handTr != null)
+            {
+                targetHandPos = handTr.position;
+                targetHandRot = handTr.rotation;
+            }
         }
 
         public void Tick(float moveLerp, float rotLerp)
@@ -522,6 +569,11 @@ public class NetworkPlayerSync : MonoBehaviour
             float b = 1f - Mathf.Exp(-rotLerp * Time.deltaTime);
             tr.position = Vector3.Lerp(tr.position, targetPos, a);
             tr.rotation = Quaternion.Slerp(tr.rotation, targetRot, b);
+            if (handTr != null)
+            {
+                handTr.position = Vector3.Lerp(handTr.position, targetHandPos, a);
+                handTr.rotation = Quaternion.Slerp(handTr.rotation, targetHandRot, b);
+            }
         }
     }
 }
