@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using TMPro; // TextMeshPro를 사용하려면 필요합니다.
 using UnityEngine;
+using UnityEngine.Playables;
 using UnityEngine.XR;
 using WS = WebSocketSharp;
 
@@ -43,6 +44,10 @@ public class NetworkPlayerSync : MonoBehaviour
     [Tooltip("로그 출력을 위한 TextMeshPro 컴포넌트")]
     public TMP_Text debugLogText;
 
+    [Header("Item Sync")]
+    [Tooltip("이 클라이언트가 현재 잡고 있는 아이템 ID (없으면 빈 문자열)")]
+    public string currentGrabbedItemId = "";
+
     // NetworkPlayerSync.cs (필드 섹션 쪽)
     public RoomPoseDisplay poseProvider;  // 인스펙터에 Drag&Drop
 
@@ -73,15 +78,40 @@ public class NetworkPlayerSync : MonoBehaviour
 
     private string _phase2Pid = "";        // 현재 세션의 player (p1/p2…)
 
+    // 이번에 서버가 보내준 스냅샷 기준으로, 이미 점유된 아이템 ID들
+    private readonly HashSet<string> _occupiedItemIds = new();
+
     // JSON 직렬화를 위한 클래스
     [Serializable] class Coordinate { public float x; public float z; }
     [Serializable] public class Hand { public float x, y, z; public Hand() { } public Hand(Vector3 v) { x = v.x; y = v.y; z = v.z; } }
-    [Serializable] class CoordinateWrap { public Coordinate coordinate; public Hand hand; }
+    [Serializable] class CoordinateWrap { public Coordinate coordinate; public Hand hand; public string grabbedItemId; }
 
-    [Serializable] public class PlayerData { public string id; public float x; public float z; public Hand hand; } // hand 추가
+    [Serializable] public class PlayerData { public string id; public float x; public float z; public Hand hand; public string grabbedItemId; } // hand 추가
     [Serializable] public class PlayersRoot { public PlayerData[] players; }
 
     [Serializable] class FirstReply { public string player; public string id; }
+
+    [Serializable]
+    class ItemPoseMsg
+    {
+        public string type = "item_pose";
+        public string id;
+        public float px, py, pz;
+    }
+
+    [Serializable]
+    public class ItemPayload
+    {
+        public string id;
+        public float x, y, z;
+    }
+
+    [Serializable]
+    public class ServerSnapshot
+    {
+        public PlayerData[] players;
+        public Dictionary<string, ItemPayload> items;
+    }
 
 
     // UI에 로그를 출력하는 헬퍼 함수
@@ -227,13 +257,26 @@ public class NetworkPlayerSync : MonoBehaviour
         {
             try
             {
-                // 서버 응답: {"players":[{ "id","x","z","hand":{x,y,z}? }]}
-                PlayersRoot root = JsonUtility.FromJson<PlayersRoot>(e.Data);
-                if (root != null && root.players != null)
+                try
                 {
-                    ApplySnapshot(root.players);
-                    return;
+                    ServerSnapshot snap = JsonUtility.FromJson<ServerSnapshot>(e.Data);
+
+                    // snap.players가 null이면 실패로 판단
+                    if (snap != null && snap.players != null)
+                    {
+                        // ---- 플레이어 스냅샷 ----
+                        ApplySnapshot(snap.players);
+
+                        // ---- 아이템 스냅샷 ----
+                        if (snap.items != null)
+                        {
+                            ApplyItemSnapshot(snap.items);
+                        }
+                        return;
+                    }
                 }
+                catch { /* ServerSnapshot parse 실패 시 다음 단계 진행 */ }
+
                 if (cLog) CustomLog("[WS] (main) msg: " + e.Data);
             }
             catch (Exception ex)
@@ -431,7 +474,8 @@ public class NetworkPlayerSync : MonoBehaviour
         var wrap = new CoordinateWrap
         {
             coordinate = new Coordinate { x = localPos.x, z = localPos.z },
-            hand = handOut.HasValue ? new Hand(handOut.Value) : null
+            hand = handOut.HasValue ? new Hand(handOut.Value) : null,
+            grabbedItemId = string.IsNullOrEmpty(currentGrabbedItemId) ? null : currentGrabbedItemId
         };
         var json = JsonUtility.ToJson(wrap);
 
@@ -445,12 +489,60 @@ public class NetworkPlayerSync : MonoBehaviour
         {
             if (cLog) CustomLog($"[SEND FATAL] ws.Send() failed: {ex.Message}");
         }
+
+        // === 여기서부터 아이템 pose 스트리밍 추가 (A안) ===
+        if (!string.IsNullOrEmpty(currentGrabbedItemId) &&
+            SimpleGrabbedItem.TryGet(currentGrabbedItemId, out var item) &&
+            item != null &&
+            item.rb != null)
+        {
+            // 1) 내가 아직 이 아이템의 "오너"인지 판정
+            //    - 손에 들고 있으면(isLocallyGrabbed) 무조건 오너
+            //    - 손에서 놓았더라도, 아직 충분히 움직이고 있으면(떨어지는 중) 오너 유지
+            float v2 = item.rb.velocity.sqrMagnitude;
+            const float restThreshold = 0.001f;
+
+            bool isOwner = item.isLocallyGrabbed || v2 >= restThreshold;
+
+            if (isOwner)
+            {
+                // 2) 현재 아이템 좌표를 서버로 보고
+                Vector3 ipos = item.transform.position;
+
+                ItemPoseMsg m = new ItemPoseMsg
+                {
+                    id = currentGrabbedItemId,
+                    px = ipos.x,
+                    py = ipos.y,
+                    pz = ipos.z
+                };
+
+                string poseJson = JsonUtility.ToJson(m);
+                if (cLog) CustomLog($"[SEND ITEM] {poseJson}");
+
+                try
+                {
+                    ws?.Send(poseJson);
+                }
+                catch (Exception ex)
+                {
+                    if (cLog) CustomLog($"[SEND ITEM FATAL] {ex.Message}");
+                }
+            }
+            else
+            {
+                // 3) 속도가 충분히 작으면 "멈췄다"고 보고 소유권 해제
+                if (cLog) CustomLog($"[ITEM REST] item={currentGrabbedItemId} at rest → release ownership");
+                currentGrabbedItemId = "";
+            }
+        }
     }
 
     // ===== 5. 수신 스냅샷 적용 로직 =====
     private void ApplySnapshot(IEnumerable<PlayerData> players)
     {
         var seen = new HashSet<string>();
+        _occupiedItemIds.Clear();
 
         foreach (var p in players)
         {
@@ -458,6 +550,12 @@ public class NetworkPlayerSync : MonoBehaviour
 
             if (string.IsNullOrEmpty(p.id)) continue;
             seen.Add(p.id);
+
+            if (cLog)
+            {
+                string gi = string.IsNullOrEmpty(p.grabbedItemId) ? "(none)" : p.grabbedItemId;
+                CustomLog($"[SYNC] Processing ID: {p.id}. My ID is {myId}. grabbedItem={gi}");
+            }
 
             // body
             Vector3 world = new Vector3(p.x, 0f, p.z);
@@ -514,6 +612,28 @@ public class NetworkPlayerSync : MonoBehaviour
                 agent.targetHandPos = handWorld;
                 agent.targetHandRot = handRot;
             }
+
+            if (!string.IsNullOrEmpty(p.grabbedItemId))
+            {
+                // 이번 프레임에 원격으로 "잡힌 상태"라고 표시된 아이템 목록에 추가
+                _occupiedItemIds.Add(p.grabbedItemId);
+            }
+
+            bool isSelf = (p.id == myId);
+
+            if (!isSelf && !string.IsNullOrEmpty(p.grabbedItemId))
+            {
+                // 실제 아이템 오브젝트 찾아오기
+                if (SimpleGrabbedItem.TryGet(p.grabbedItemId, out var item))
+                {
+                    // 내가 직접 잡고 있는 아이템이면 원격 정보로 덮어쓰지 않음
+                    if (!item.isLocallyGrabbed)
+                    {
+                        // 원격 Grab 상태 진입
+                        item.OnRemoteGrabStart();
+                    }
+                }
+            }
         }
 
         //    — 유령 잔상 방지
@@ -533,7 +653,44 @@ public class NetworkPlayerSync : MonoBehaviour
             }
             agents.Remove(id);
         }
+
+        foreach (var kv in SimpleGrabbedItem.Registry)
+        {
+            var item = kv.Value;
+            if (item == null) continue;
+
+            // 내가 직접 잡은 아이템이면 건들지 않음
+            if (item.isLocallyGrabbed) continue;
+
+            // 이번 스냅샷에서 "원격 grabbed" 목록에 없으면 → Free
+            if (!_occupiedItemIds.Contains(item.itemId))
+            {
+                item.OnRemoteGrabEnd();
+            }
+        }
     }
+
+    private void ApplyItemSnapshot(Dictionary<string, ItemPayload> items)
+    {
+        foreach (var kv in items)
+        {
+            string itemId = kv.Key;
+            var data = kv.Value;
+
+            if (!SimpleGrabbedItem.TryGet(itemId, out var item) || item == null)
+                continue;
+
+            // 1) 내가 로컬로 잡고 있는 아이템이면 (손에 들고 있거나 막 던진 직후)
+            //    → 로컬 물리/손이 위치를 결정하므로 스냅샷으로 덮어쓰지 않음
+            if (item.isLocallyGrabbed || itemId == currentGrabbedItemId)
+                continue;
+
+            // 2) 그 외(원격 소유 or free 상태)는 그냥 좌표만 맞춰줌
+            //    물리 상태(kinematic/gravity)는 OnRemoteGrabStart/End에서 관리
+            item.transform.position = new Vector3(data.x, data.y, data.z);
+        }
+    }
+
 
     // ===== 6. 원격 에이전트 클래스 (위치 보간) =====
     private class RemoteAgent
