@@ -2,21 +2,21 @@ using UnityEngine;
 
 public class TestItemGrabController : MonoBehaviour
 {
-    [Header("Target Item (¾À¿¡ ¹Ì¸® ÀÖ´Â ¾ÆÀÌÅÛ)")]
-    public SimpleGrabbedItem targetItem;        // Å×½ºÆ®ÇÒ ¾ÆÀÌÅÛ
+    [Header("Target Item (ï¿½ï¿½ï¿½ï¿½ ï¿½Ì¸ï¿½ ï¿½Ö´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)")]
+    public SimpleGrabbedItem targetItem;        // ï¿½×½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
     [Header("Hand Provider")]
-    public HandPoseProvider handProvider;       // NPS¿¡¼­ ¾²´ø ±× HandPoseProvider¸¦ ±×´ë·Î ÂüÁ¶
+    public HandPoseProvider handProvider;       // NPSï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ HandPoseProviderï¿½ï¿½ ï¿½×´ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 
     [Header("Double Tap Settings")]
-    public float doubleTapMaxDelay = 0.25f;     // µÎ ¹ø ÅÇ °£ ÃÖ´ë ½Ã°£(ÃÊ)
+    public float doubleTapMaxDelay = 0.25f;     // ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ ï¿½Ö´ï¿½ ï¿½Ã°ï¿½(ï¿½ï¿½)
 
     [Header("Distance Test")]
-    public bool useDistanceCheck = false;       // true¸é °Å¸® Á¦ÇÑ »ç¿ë
-    public float maxGrabDistance = 5.0f;        // ¼Õ-¾ÆÀÌÅÛ ÃÖ´ë °Å¸® (Å×½ºÆ®¿ë, Å©°Ô ÀâÀ¸¸é ¸Ö¸®¼­µµ ÀâÈû)
+    public bool useDistanceCheck = false;       // trueï¿½ï¿½ ï¿½Å¸ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
+    public float maxGrabDistance = 5.0f;        // ï¿½ï¿½-ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ö´ï¿½ ï¿½Å¸ï¿½ (ï¿½×½ï¿½Æ®ï¿½ï¿½, Å©ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
 
     private float lastTapTime = -999f;
-    private bool held = false;                  // ÇöÀç ÀÌ ¾ÆÀÌÅÛÀ» ³»°¡ Àâ°í ÀÖ´ÂÁö
+    private bool held = false;                  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½Ö´ï¿½ï¿½ï¿½
 
     private NetworkPlayerSync nps;
 
@@ -25,7 +25,7 @@ public class TestItemGrabController : MonoBehaviour
         nps = FindObjectOfType<NetworkPlayerSync>();
         if (!nps)
         {
-            Debug.LogWarning("[TestItemGrab] NetworkPlayerSync¸¦ ¾À¿¡¼­ Ã£Áö ¸øÇÔ.");
+            Debug.LogWarning("[TestItemGrab] NetworkPlayerSyncï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Ã£ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½.");
         }
     }
 
@@ -45,7 +45,7 @@ public class TestItemGrabController : MonoBehaviour
             }
         }
 #else
-        // ¿¡µðÅÍ/PC¿ëÀ¸·Î ¸¶¿ì½º ´õºíÅ¬¸¯µµ Çã¿ë
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½/PCï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ì½º ï¿½ï¿½ï¿½ï¿½Å¬ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
         if (Input.GetMouseButtonDown(0))
         {
             if (Time.time - lastTapTime <= doubleTapMaxDelay)
@@ -59,14 +59,14 @@ public class TestItemGrabController : MonoBehaviour
             ToggleGrab();
         }
 
-        // === Àâ°í ÀÖ´Â µ¿¾È¿¡´Â ¼Õ À§Ä¡¸¦ µû¶ó°¡°Ô ÇÔ ===
+        // === ï¿½ï¿½ï¿½ ï¿½Ö´ï¿½ ï¿½ï¿½ï¿½È¿ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½ï¿½ï¿½ó°¡°ï¿½ ï¿½ï¿½ ===
         if (held && targetItem != null && handProvider != null)
         {
             if (handProvider.TryGetHandWorld(out var handWorld))
             {
-                // HandPoseProvider°¡ ÁÖ´Â ¿ùµåÁÂÇ¥ ±×´ë·Î »ç¿ë
+                // HandPoseProviderï¿½ï¿½ ï¿½Ö´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç¥ ï¿½×´ï¿½ï¿½ ï¿½ï¿½ï¿½
                 targetItem.transform.position = handWorld;
-                // È¸Àü±îÁö ¸ÂÃß°í ½ÍÀ¸¸é ÇÊ¿äÇÒ ¶§ ¾Æ·¡ ÄÑ¸é µÊ
+                // È¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ß°ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ê¿ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Æ·ï¿½ ï¿½Ñ¸ï¿½ ï¿½ï¿½
                 // targetItem.transform.rotation = Quaternion.LookRotation(handWorldDir ...);
             }
         }
@@ -76,49 +76,49 @@ public class TestItemGrabController : MonoBehaviour
     {
         if (!targetItem)
         {
-            Debug.LogWarning("[TestItemGrab] targetItemÀÌ ¼³Á¤µÇ¾î ÀÖÁö ¾ÊÀ½.");
+            Debug.LogWarning("[TestItemGrab] targetItemï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ç¾ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½.");
             return;
         }
 
         if (handProvider == null)
         {
-            Debug.LogWarning("[TestItemGrab] handProvider°¡ ¼³Á¤µÇ¾î ÀÖÁö ¾ÊÀ½.");
+            Debug.LogWarning("[TestItemGrab] handProviderï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ç¾ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½.");
             return;
         }
 
         if (!held)
         {
-            // ===== Grab ½ÃÀÛ =====
-            // 1) ¼Õ ¿ùµåÁÂÇ¥ °¡Á®¿À±â
+            // ===== Grab ï¿½ï¿½ï¿½ï¿½ =====
+            // 1) ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç¥ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             if (!handProvider.TryGetHandWorld(out var handWorld))
             {
-                Debug.LogWarning("[TestItemGrab] HandPoseProvider¿¡¼­ ¼Õ ÁÂÇ¥¸¦ °¡Á®¿ÀÁö ¸øÇÔ.");
+                Debug.LogWarning("[TestItemGrab] HandPoseProviderï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½Ç¥ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½.");
                 return;
             }
 
-            // 2) (¿É¼Ç) °Å¸® Á¦ÇÑ Ã¼Å©
+            // 2) (ï¿½É¼ï¿½) ï¿½Å¸ï¿½ ï¿½ï¿½ï¿½ï¿½ Ã¼Å©
             if (useDistanceCheck)
             {
                 float dist = Vector3.Distance(handWorld, targetItem.transform.position);
                 if (dist > maxGrabDistance)
                 {
-                    Debug.Log($"[TestItemGrab] ³Ê¹« ¸Ö¾î¼­ Grab ºÒ°¡. dist={dist:F2} > max={maxGrabDistance:F2}");
+                    Debug.Log($"[TestItemGrab] ï¿½Ê¹ï¿½ ï¿½Ö¾î¼­ Grab ï¿½Ò°ï¿½. dist={dist:F2} > max={maxGrabDistance:F2}");
                     return;
                 }
             }
 
             held = true;
 
-            // ·ÎÄÃ¿¡¼­ Àâ±â ½ÃÀÛ
+            // ï¿½ï¿½ï¿½Ã¿ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             targetItem.OnLocalGrabStart();
 
-            // NPS¿¡ "ÀÌ ¾ÆÀÌÅÛÀÇ ¿À³Ê´Â ³ª"¶ó°í ¾Ë·ÁÁÜ
+            // NPSï¿½ï¿½ "ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ê´ï¿½ ï¿½ï¿½"ï¿½ï¿½ï¿½ ï¿½Ë·ï¿½ï¿½ï¿½
             if (nps != null)
             {
                 nps.currentGrabbedItemId = targetItem.itemId;
             }
 
-            // Àâ´Â ¼ø°£ ¼Õ À§Ä¡·Î ÇÑ ¹ø ½º³À
+            // ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             targetItem.transform.position = handWorld;
 
             Debug.Log($"[TestItemGrab] GRAB start: {targetItem.itemId}");
@@ -128,13 +128,13 @@ public class TestItemGrabController : MonoBehaviour
             // ===== Release (Drop) =====
             held = false;
 
-            // ·ÎÄÃ¿¡¼­ ³õ±â ¡æ Rigidbody¿¡ Áß·Â Àû¿ë
+            // ï¿½ï¿½ï¿½Ã¿ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ Rigidbodyï¿½ï¿½ ï¿½ß·ï¿½ ï¿½ï¿½ï¿½ï¿½
             targetItem.OnLocalGrabEnd(Vector3.zero);
 
-            // ¡Ø ¿©±â¼­´Â currentGrabbedItemId¸¦ ºñ¿ìÁö ¾ÊÀ½
-            //    ¶³¾îÁö´Â µ¿¾È¿¡µµ owner-streamingÀ» °è¼Ó º¸³»¾ß ÇØ¼­
-            //    NetworkPlayerSync.SendMyPose() ¾È¿¡¼­
-            //    ¼Óµµ°¡ ÃæºÐÈ÷ ÀÛ¾ÆÁ³À» ¶§ currentGrabbedItemId = ""·Î ÇØÁ¦µÊ
+            // ï¿½ï¿½ ï¿½ï¿½ï¿½â¼­ï¿½ï¿½ currentGrabbedItemIdï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+            //    ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½È¿ï¿½ï¿½ï¿½ owner-streamingï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ø¼ï¿½
+            //    NetworkPlayerSync.SendMyPose() ï¿½È¿ï¿½ï¿½ï¿½
+            //    ï¿½Óµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Û¾ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ currentGrabbedItemId = ""ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
             Debug.Log($"[TestItemGrab] GRAB end(drop): {targetItem.itemId}");
         }

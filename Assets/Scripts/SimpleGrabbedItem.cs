@@ -2,101 +2,80 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-///   1) itemId·Î ¾ÆÀÌÅÛÀ» ½Äº°ÇÒ ¼ö ÀÖ°Ô ÇØÁÖ°í
-///   2) ·ÎÄÃ/¿ø°İ Grab »óÅÂ¿¡ µû¶ó Rigidbody ¼¼ÆÃ¸¸ °ü¸®ÇÔ.
-/// ½ÇÁ¦ Grab/Release Æ®¸®°Å(¹öÆ° ÀÔ·Â)´Â ´Ù¸¥ ½ºÅ©¸³Æ®¿¡¼­ È£Ãâ.
-
 [RequireComponent(typeof(Rigidbody))]
 public class SimpleGrabbedItem : MonoBehaviour
 {
-    // === static ·¹Áö½ºÆ®¸®: itemId -> SimpleGrabbedItem ===
+    // [ìˆ˜ì •] int -> stringìœ¼ë¡œ ë³µêµ¬ (ê¸°ì¡´ ì½”ë“œ í˜¸í™˜ì„± ìœ„í•¨)
     public static readonly Dictionary<string, SimpleGrabbedItem> Registry = new();
     public static bool TryGet(string id, out SimpleGrabbedItem item) => Registry.TryGetValue(id, out item);
 
     [Header("ID")]
-    [Tooltip("¼­¹ö/Å¬¶óÀÌ¾ğÆ® ÀüÃ¼¿¡¼­ À¯ÀÏÇÑ ¾ÆÀÌÅÛ ID (¿¹: arrow1, torchA µî)")]
-    public string itemId;
+    [Tooltip("ë„¤íŠ¸ì›Œí¬ ë™ê¸°í™”ìš© ê³ ìœ  ID (ì˜ˆ: item_1, sword_A)")]
+    public string itemId; // [ìˆ˜ì •] ë‹¤ì‹œ stringìœ¼ë¡œ ë³€ê²½
 
     [Header("Refs")]
     public Rigidbody rb;
 
-    [Header("State (Debug)")]
-    [Tooltip("ÀÌ Å¬¶óÀÌ¾ğÆ®¿¡¼­ Á÷Á¢ Àâ°í ÀÖ´ÂÁö ¿©ºÎ")]
+    [Header("State")]
     public bool isLocallyGrabbed = false;
-
-    [Tooltip("´Ù¸¥ ÇÃ·¹ÀÌ¾î°¡ Àâ¾Æ¼­, ÀÌ Å¬¶ó¿¡¼­´Â ¿ø°İÀ¸·Î µû¶ó°¡´Â »óÅÂÀÎÁö ¿©ºÎ")]
     public bool isRemotelyGrabbed = false;
 
     private void Awake()
     {
-        if (!rb)
-            rb = GetComponent<Rigidbody>();
+        if (!rb) rb = GetComponent<Rigidbody>();
 
-        // ·¹Áö½ºÆ®¸®¿¡ µî·Ï
-        if (!string.IsNullOrEmpty(itemId))
+        // [ìˆ˜ì •] string í‚¤ë¡œ ë“±ë¡
+        if (!string.IsNullOrEmpty(itemId) && !Registry.ContainsKey(itemId))
         {
             Registry[itemId] = this;
         }
 
-        // ±âº»Àº ÀÚÀ¯ »óÅÂ: ¹°¸® on
         rb.isKinematic = false;
         rb.useGravity = true;
     }
 
     private void OnDestroy()
     {
-        if (!string.IsNullOrEmpty(itemId) && Registry.TryGetValue(itemId, out var me) && me == this)
+        if (!string.IsNullOrEmpty(itemId) && Registry.ContainsKey(itemId) && Registry[itemId] == this)
         {
             Registry.Remove(itemId);
         }
     }
 
-    // ===== ·ÎÄÃ ÇÃ·¹ÀÌ¾î°¡ ÀÌ ¾ÆÀÌÅÛÀ» Àâ±â ½ÃÀÛ =====
     public void OnLocalGrabStart()
     {
         isLocallyGrabbed = true;
         isRemotelyGrabbed = false;
-
-        // ¼ÕÀÌ Á÷Á¢ À§Ä¡¸¦ ¿òÁ÷ÀÏ °Å¶ó ¹°¸®´Â Àá±ñ ²û
+        
         rb.isKinematic = true;
         rb.useGravity = false;
     }
 
-    // ===== ·ÎÄÃ ÇÃ·¹ÀÌ¾î°¡ ÀÌ ¾ÆÀÌÅÛÀ» ³õÀ» ¶§ =====
-    // throwVelocity¿¡´Â ¼ÕÀÇ ¼Óµµ¸¦ ³ÖÀ¸¸é "´øÁö´Â" ´À³¦ °¡´É (Áö±İÀº 0 ³Ö¾îµµ µÊ)
     public void OnLocalGrabEnd(Vector3 throwVelocity)
     {
         isLocallyGrabbed = false;
-
+        
         rb.isKinematic = false;
         rb.useGravity = true;
         rb.velocity = throwVelocity;
     }
 
-    // ===== ´Ù¸¥ ÇÃ·¹ÀÌ¾î°¡ (¿ø°İ¿¡¼­) Àâ±â ½ÃÀÛÇß´Ù°í ¼­¹ö°¡ ¾Ë·ÁÁáÀ» ¶§ =====
     public void OnRemoteGrabStart()
     {
-        // ³»°¡ Á÷Á¢ Àâ°í ÀÖ´Â ÁßÀÌ¸é ¿ø°İ »óÅÂ·Î µ¤¾î¾²Áö ¾ÊÀ½
         if (isLocallyGrabbed) return;
-
+        
         isRemotelyGrabbed = true;
-
         rb.isKinematic = true;
         rb.useGravity = false;
     }
 
-    // ===== ´Ù¸¥ ÇÃ·¹ÀÌ¾î°¡ (¿ø°İ¿¡¼­) ³õ¾ÒÀ» ¶§ =====
     public void OnRemoteGrabEnd()
     {
-        // ³»°¡ Àâ°í ÀÖ´Â ÁßÀÌ¸é free·Î µ¹¸®Áö ¾ÊÀ½
         if (isLocallyGrabbed) return;
-
         if (!isRemotelyGrabbed) return;
 
         isRemotelyGrabbed = false;
-
         rb.isKinematic = false;
         rb.useGravity = true;
-        // ¼Óµµ´Â ÀÏ´Ü 0À¸·Î µÎ°í, °¢ Å¬¶ó ¹°¸®¿¡ ¸Ã±è
     }
 }

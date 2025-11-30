@@ -3266,8 +3266,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   F1: {fileID: 963490127}
   F2: {fileID: 963490126}
-  grab_treshhold: 0.05
-  grab_object_treshhold: 0.1
+  grab_threshold: 0.05
+  grab_radius: 0.1
+  grabbableLayer:
+    serializedVersion: 2
+    m_Bits: 64
 --- !u!1 &4124183347678237743
 GameObject:
   m_ObjectHideFlags: 0
@@ -3281,6 +3284,8 @@ GameObject:
   - component: {fileID: 2244396728658889786}
   - component: {fileID: 8161402102339364611}
   - component: {fileID: 7445866151012006115}
+  - component: {fileID: 9167307963014006538}
+  - component: {fileID: 9167307963014006537}
   m_Layer: 6
   m_Name: Cube 1
   m_TagString: Untagged
@@ -3390,6 +3395,52 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &9167307963014006537
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4124183347678237743}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 513df4deb756d7f43bb7a521f2fc29b1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  itemId: cube1
+  rb: {fileID: 0}
+  isLocallyGrabbed: 0
+  isRemotelyGrabbed: 0
+--- !u!114 &9167307963014006538
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4124183347678237743}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc69d545e4f0f3048ba89bba34414ce4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  serverWsUrl: ws://192.168.219.102:8080/ws
+  myId: 
+  localPlayer: {fileID: 0}
+  sharedOrigin: {fileID: 0}
+  remoteAvatarPrefab: {fileID: 0}
+  remoteHandPrefab: {fileID: 0}
+  sendHz: 15
+  moveLerp: 12
+  rotLerp: 12
+  minDeltaToSend: 0.01
+  useCVR: 1
+  requireCalibToSync: 1
+  renderSelfFromServer: 0
+  handProvider: {fileID: 0}
+  includeHand: 1
+  debugLogText: {fileID: 0}
+  currentGrabbedItemId: 
+  poseProvider: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
