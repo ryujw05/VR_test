@@ -215,12 +215,30 @@ public class FloorRoomStateMachine : MonoBehaviour
         roomCube.name = "GameRoom";
         roomCube.transform.SetParent(anchorGO.transform, false);
         roomCube.transform.localScale = Vector3.one * roomSizeMeters;
+        // ★ [추가] 방을 나타내는 큐브는 물리 충돌을 일으키면 안 되므로 콜라이더 제거
+        Collider cubeCol = roomCube.GetComponent<Collider>();
+        if (cubeCol) Destroy(cubeCol);
 
         if (roomMaterial)
         {
             var mr = roomCube.GetComponent<MeshRenderer>();
             if (mr) mr.material = roomMaterial;
         }
+
+        //////////////after test destroy
+        // 3. ★ [추가] 물리적 바닥 판(Floor Plate) 생성
+        // 0,0,0 위치에 얇은 판을 깔아서 아이템이 떨어지지 않게 함
+        GameObject floorPlate = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        floorPlate.name = "FloorPlate";
+        floorPlate.transform.SetParent(anchorGO.transform, false);
+        // 크기는 방보다 약간 크게, 두께는 얇게(0.1m)
+        floorPlate.transform.localScale = new Vector3(roomSizeMeters, 0.1f, roomSizeMeters);
+        // 바닥면(Y=0) 바로 아래에 위치하도록 설정 (아이템이 0에 딱 얹히게)
+        floorPlate.transform.localPosition = new Vector3(0, -0.05f, 0);
+
+        // ★ [중요] 레이어 설정: Grabbable이 아닌 'Default' 레이어로 설정
+        // (그래야 손이 바닥을 아이템으로 인식해서 잡으려 하지 않음)
+        floorPlate.layer = 0; // 0 = Default Layer
 
         BuildCubeEdges(roomCube.transform, roomSizeMeters, Color.red, 0.005f);
     }

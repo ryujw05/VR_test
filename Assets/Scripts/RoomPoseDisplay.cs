@@ -15,6 +15,10 @@ public class RoomPoseDisplay : MonoBehaviour
 
     // ���� ����
     private Transform roomRef;       // ���� ��ǥ��(= RoomAnchor �켱, ������ GameRoom)
+    public Transform GetRoomAnchor()
+    {
+        return roomRef;
+    }
     private Vector2 lastStableXZ;    // ������ ���� XZ (room-space)
     private float lastStableYawDeg;  // ������ ���� yaw (deg, room-space)
     private bool gyroSupported;

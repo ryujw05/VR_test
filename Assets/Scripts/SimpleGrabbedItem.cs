@@ -20,6 +20,8 @@ public class SimpleGrabbedItem : MonoBehaviour
     public bool isLocallyGrabbed = false;
     public bool isRemotelyGrabbed = false;
 
+    private float _debugTimer;
+
     private void Awake()
     {
         if (!rb) rb = GetComponent<Rigidbody>();
@@ -78,4 +80,59 @@ public class SimpleGrabbedItem : MonoBehaviour
         rb.isKinematic = false;
         rb.useGravity = true;
     }
+
+    //////////after test destroy
+    private void Update()
+    {
+        // 1. [생존 신고] 3초마다 로그 (디버깅용 유지)
+        _debugTimer += Time.deltaTime;
+        if (_debugTimer > 3.0f)
+        {
+            _debugTimer = 0f;
+            string parentName = transform.parent ? transform.parent.name : "null";
+            string msg = $"[ITEM] {itemId} / WorldPos: {transform.position} / Parent: {parentName}";
+
+            if (NetworkPlayerSync.Instance != null)
+                NetworkPlayerSync.Instance.CustomLog(msg);
+        }
+    }
+
+    // ★ [추가] UI 버튼과 연결할 소환 함수 (Public)
+    // SimpleGrabbedItem.cs
+
+    public void SummonToRoomOrigin()
+    {
+        Transform roomAnchor = null;
+        if (NetworkPlayerSync.Instance != null && NetworkPlayerSync.Instance.poseProvider != null)
+        {
+            roomAnchor = NetworkPlayerSync.Instance.poseProvider.GetRoomAnchor();
+        }
+
+        if (roomAnchor != null)
+        {
+            // 1. 위치 이동 (기존 코드)
+            transform.position = roomAnchor.position + Vector3.up * 0.5f; // 바닥보다 0.5m 위에서 떨어지게
+            transform.rotation = roomAnchor.rotation;
+            NetworkPlayerSync.Instance.CustomLog($"[SUMMON] {itemId} to Anchor!");
+        }
+        else
+        {
+            transform.position = Vector3.up * 0.5f; // 월드 기준
+        }
+
+        // 2. 물리 초기화
+        if (rb)
+        {
+            rb.velocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
+
+        // 3. ★ [핵심 추가] 강제 소유권 주장
+        // 이걸 설정해야 NetworkPlayerSync가 "아, 내가 이 아이템의 좌표를 서버에 보내야 하는구나"라고 인식함
+        if (NetworkPlayerSync.Instance != null)
+        {
+            NetworkPlayerSync.Instance.currentGrabbedItemId = this.itemId;
+        }
+    }
 }
+
