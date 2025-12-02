@@ -1,0 +1,54 @@
+{
+    "name": "AR",
+    "maps": [
+        {
+            "name": "AR",
+            "id": "d9d5c3ae-97bb-4ae2-92e9-504d7630299f",
+            "actions": [
+                {
+                    "name": "deviceRotation",
+                    "type": "Value",
+                    "id": "1e4ea5a3-77f1-4feb-83f9-2111e3527b95",
+                    "expectedControlType": "Quaternion",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "devicePosition",
+                    "type": "Value",
+                    "id": "64c05006-0aa1-4a6b-99cb-59d6d4f0490e",
+                    "expectedControlType": "Vector3",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "4cf367c5-8874-4109-ab80-4f8903949165",
+                    "path": "<HandheldARInputDevice>/devicePosition",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "devicePosition",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2aecd837-b8ac-4457-b565-401079010548",
+                    "path": "<HandheldARInputDevice>/deviceRotation",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "deviceRotation",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        }
+    ],
+    "controlSchemes": []
+}
