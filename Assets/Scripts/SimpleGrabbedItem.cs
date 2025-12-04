@@ -5,100 +5,116 @@ using UnityEngine;
 [RequireComponent(typeof(Rigidbody))]
 public class SimpleGrabbedItem : MonoBehaviour
 {
-    // [수정] int -> string으로 복구 (기존 코드 호환성 위함)
     public static readonly Dictionary<string, SimpleGrabbedItem> Registry = new();
     public static bool TryGet(string id, out SimpleGrabbedItem item) => Registry.TryGetValue(id, out item);
 
     [Header("ID")]
-    [Tooltip("네트워크 동기화용 고유 ID (예: item_1, sword_A)")]
-    public string itemId; // [수정] 다시 string으로 변경
+    public string itemId;
 
     [Header("Refs")]
     public Rigidbody rb;
 
     [Header("State")]
     public bool isLocallyGrabbed = false;
-    public bool isRemotelyGrabbed = false;
+    public bool isRemotelyGrabbed = false; // 다른 플레이어가 손에 쥔 상태
 
-    private float _debugTimer;
+    // ★ 추가: 네트워크로 위치만 동기화 중인지 여부 (바닥에 놓여있거나 던져진 상태)
+    private bool isNetworkMoving = false;
+    private float lastNetworkUpdateResponceTime = 0f;
 
     private void Awake()
     {
         if (!rb) rb = GetComponent<Rigidbody>();
+        if (!string.IsNullOrEmpty(itemId)) Registry[itemId] = this;
 
-        // [수정] string 키로 등록
-        if (!string.IsNullOrEmpty(itemId) && !Registry.ContainsKey(itemId))
-        {
-            Registry[itemId] = this;
-        }
-
+        // 시작할 때는 물리 켜두기 (싱글 테스트 호환)
         rb.isKinematic = false;
         rb.useGravity = true;
     }
 
     private void OnDestroy()
     {
-        if (!string.IsNullOrEmpty(itemId) && Registry.ContainsKey(itemId) && Registry[itemId] == this)
+        if (!string.IsNullOrEmpty(itemId) && Registry.ContainsKey(itemId)) Registry.Remove(itemId);
+    }
+
+    private void Update()
+    {
+        // ★ 추가: 네트워크 업데이트가 끊기면(1초 이상) 다시 물리 적용 (안전장치)
+        if (isNetworkMoving && !isLocallyGrabbed && !isRemotelyGrabbed)
         {
-            Registry.Remove(itemId);
+            if (Time.time - lastNetworkUpdateResponceTime > 1.0f)
+            {
+                isNetworkMoving = false;
+                rb.isKinematic = false; // 다시 물리 켜기
+                // Debug.Log($"[Item] {itemId} Network idle -> Physics On");
+            }
         }
     }
 
+    // 1. 내가 잡았을 때
     public void OnLocalGrabStart()
     {
         isLocallyGrabbed = true;
-        isRemotelyGrabbed = false;
-
-        rb.isKinematic = true;
+        isNetworkMoving = false;
+        rb.isKinematic = true; // 물리 끄기 (손따라가야 함)
         rb.useGravity = false;
     }
 
+    // 2. 내가 놓았을 때 (던지기)
     public void OnLocalGrabEnd(Vector3 throwVelocity)
     {
         isLocallyGrabbed = false;
+        isNetworkMoving = false;
 
+        // 내가 던졌으므로 내 컴퓨터에서 물리를 계산해야 함 -> 물리 켜기
         rb.isKinematic = false;
         rb.useGravity = true;
         rb.velocity = throwVelocity;
     }
 
+    // 3. 남이 잡았을 때 (NetworkPlayerSync에서 호출)
     public void OnRemoteGrabStart()
     {
         if (isLocallyGrabbed) return;
-
         isRemotelyGrabbed = true;
-        rb.isKinematic = true;
+        rb.isKinematic = true; // 물리 끄기
         rb.useGravity = false;
     }
 
     public void OnRemoteGrabEnd()
     {
         if (isLocallyGrabbed) return;
-        if (!isRemotelyGrabbed) return;
-
         isRemotelyGrabbed = false;
-        rb.isKinematic = false;
-        rb.useGravity = true;
+        // 여기서 바로 물리를 켜면 안됨! (공중에 있을 수 있음)
+        // 자연스럽게 UpdateRemotePose가 끊기면 Update()에서 켜지도록 유도하거나,
+        // 혹은 바로 켤 수도 있음. 상황에 따라 다름. 일단은 유지.
     }
 
-    //////////after test destroy
-    private void Update()
+    // ★ 핵심 추가 함수: 서버에서 좌표를 받아 갱신할 때 호출
+    public void UpdateRemotePose(Vector3 targetPos, float lerpRate)
     {
-        // 1. [생존 신고] 3초마다 로그 (디버깅용 유지)
-        _debugTimer += Time.deltaTime;
-        if (_debugTimer > 3.0f)
+        if (isLocallyGrabbed) return; // 내가 잡고 있으면 서버 무시
+
+        // 네트워크 데이터를 받는 동안은 물리를 무조건 끕니다.
+        isNetworkMoving = true;
+        lastNetworkUpdateResponceTime = Time.time;
+
+        rb.isKinematic = true;
+        rb.useGravity = false;
+
+        // 부드러운 이동
+        float dist = Vector3.Distance(transform.position, targetPos);
+        if (dist > 2.0f) // 거리가 너무 멀면 텔레포트 (초기화 등)
         {
-            _debugTimer = 0f;
-            string parentName = transform.parent ? transform.parent.name : "null";
-            string msg = $"[ITEM] {itemId} / WorldPos: {transform.position} / Parent: {parentName}";
-
-            if (NetworkPlayerSync.Instance != null)
-                NetworkPlayerSync.Instance.CustomLog(msg);
+            transform.position = targetPos;
         }
-    }
+        else
+        {
+            transform.position = Vector3.Lerp(transform.position, targetPos, Time.deltaTime * lerpRate);
+        }
 
-    // ★ [추가] UI 버튼과 연결할 소환 함수 (Public)
-    // SimpleGrabbedItem.cs
+        // 회전도 있다면 여기서 Lerp
+    }
 
     public void SummonToRoomOrigin()
     {

@@ -775,8 +775,6 @@ public class NetworkPlayerSync : MonoBehaviour
             }
         }
     }
-
-    //
     private void ApplyItemSnapshot(ItemPayload[] items)
     {
         // 룸 앵커 확인
@@ -786,69 +784,32 @@ public class NetworkPlayerSync : MonoBehaviour
 
         foreach (var data in items)
         {
-            string itemId = data.id; // 배열 객체에서 ID 꺼내기
+            string itemId = data.id;
 
-            // [체크 1] 아이템이 레지스트리에 있는가?
-            if (!SimpleGrabbedItem.TryGet(itemId, out var item) || item == null)
-            {
-                // 너무 자주 뜨면 주석 처리
-                // if (xLog) CustomLog($"[SYNC FAIL] {itemId} not found in Registry!");
-                continue;
-            }
+            if (!SimpleGrabbedItem.TryGet(itemId, out var item) || item == null) continue;
 
-            // 내가 잡고 있으면 무시
-            if (item.isLocallyGrabbed)
-            {
-                // if (xLog) CustomLog($"[SYNC SKIP] {itemId} is locally grabbed.");
-                continue;
-            }
+            // 내가 잡고 있거나, 내가 던지는 중(오너십 유지)이면 무시
+            if (item.isLocallyGrabbed) continue;
+            if (itemId == currentGrabbedItemId) continue;
 
-            // 내가 방금 던져서 소유권이 아직 나한테 있으면 무시
-            if (itemId == currentGrabbedItemId)
-            {
-                // if (xLog) CustomLog($"[SYNC SKIP] {itemId} ID matches my currentGrabbedItemId.");
-                continue;
-            }
-
-            // === 좌표 역변환: CVR -> Room Local -> World ===
+            // 좌표 변환 로직 (기존 유지)
             Vector3 targetRoomPos;
-
             if (useCVR && hasCVR)
             {
-                // 받은 데이터(x, z)는 CVR 좌표임. 역변환 수행.
                 Vector2 cvrXZ = new Vector2(data.x, data.z);
-
-                // Rot2D(..., +cvrYawRad) -> Origin 더하기
                 Vector2 roomXZ = Rot2D(cvrXZ, cvrYawRad) / cvrScale + cvrOriginXZ;
-
-                // y는 높이 그대로
                 targetRoomPos = new Vector3(roomXZ.x, data.y, roomXZ.y);
             }
             else
             {
-                // CVR 안 쓰면 받은 게 곧 Room Local
                 targetRoomPos = new Vector3(data.x, data.y, data.z);
             }
 
-            // Room Local -> World 변환
             Vector3 targetWorldPos = roomAnchor.TransformPoint(targetRoomPos);
 
-            // === 부드러운 위치 동기화 (Lerp) ===
-            float dist = Vector3.Distance(item.transform.position, targetWorldPos);
-
-            // 거리가 너무 멀면(초기화 등) 바로 텔레포트, 아니면 부드럽게 이동
-            if (dist > 1.0f)
-            {
-                item.transform.position = targetWorldPos;
-            }
-            else
-            {
-                // sendHz(15) 등을 고려해 적절한 속도로 보간 (Time.deltaTime * lerpSpeed)
-                item.transform.position = Vector3.Lerp(item.transform.position, targetWorldPos, Time.deltaTime * moveLerp);
-            }
-
-            // (선택) 회전 동기화는 현재 데이터에 없으므로 생략됨.
-            // 필요하다면 ItemPoseMsg에 rx, ry, rz 등을 추가해야 함.
+            // ★ [수정] 직접 Transform을 건드리지 말고, 아이템 스크립트에 위임
+            // 이렇게 해야 아이템이 스스로 "아, 나 지금 네트워크 조종 당하는구나"라고 알고 물리를 끕니다.
+            item.UpdateRemotePose(targetWorldPos, moveLerp);
         }
     }
 
