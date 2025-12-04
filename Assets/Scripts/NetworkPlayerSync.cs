@@ -768,10 +768,6 @@ public class NetworkPlayerSync : MonoBehaviour
             // 내가 직접 잡은 아이템이면 건들지 않음
             if (item.isLocallyGrabbed) continue;
 
-            // ★ [수정] 중요 추가: 내가 소유권(Summon 등)을 주장하고 있는 아이템이라면
-            // 서버 스냅샷에서 주인이 없다고 나와도(지연 시간 차이) 물리력을 켜지 않는다.
-            if (item.itemId == currentGrabbedItemId) continue;
-
             // 이번 스냅샷에서 "원격 grabbed" 목록에 없으면 → Free
             if (!_occupiedItemIds.Contains(item.itemId))
             {
@@ -780,7 +776,6 @@ public class NetworkPlayerSync : MonoBehaviour
         }
     }
 
-    // [수정] 인자를 Dictionary가 아닌 배열로 변경
     private void ApplyItemSnapshot(ItemPayload[] items)
     {
         // 룸 앵커 확인
@@ -788,7 +783,6 @@ public class NetworkPlayerSync : MonoBehaviour
         if (poseProvider != null) roomAnchor = poseProvider.GetRoomAnchor();
         if (roomAnchor == null) return;
 
-        // [수정] 배열 순회
         foreach (var data in items)
         {
             string itemId = data.id; // 배열 객체에서 ID 꺼내기
@@ -815,10 +809,6 @@ public class NetworkPlayerSync : MonoBehaviour
                 continue;
             }
 
-            // [디버그] 데이터 수신 확인용 (작동하면 주석 처리)
-            if (xLog && Time.frameCount % 60 == 0)
-                CustomLog($"[SYNC RECV] {itemId} => ({data.x:F2}, {data.y:F2}, {data.z:F2})");
-
             // === 좌표 역변환: CVR -> Room Local -> World ===
             Vector3 targetRoomPos;
 
@@ -842,12 +832,25 @@ public class NetworkPlayerSync : MonoBehaviour
             // Room Local -> World 변환
             Vector3 targetWorldPos = roomAnchor.TransformPoint(targetRoomPos);
 
-            // if (xLog) CustomLog($"[RECV SET] {itemId} Target: {targetWorldPos}");
+            // === 부드러운 위치 동기화 (Lerp) ===
+            float dist = Vector3.Distance(item.transform.position, targetWorldPos);
 
-            // 명령 하달
-            item.SetNetworkTarget(targetWorldPos, moveLerp);
+            // 거리가 너무 멀면(초기화 등) 바로 텔레포트, 아니면 부드럽게 이동
+            if (dist > 1.0f)
+            {
+                item.transform.position = targetWorldPos;
+            }
+            else
+            {
+                // sendHz(15) 등을 고려해 적절한 속도로 보간 (Time.deltaTime * lerpSpeed)
+                item.transform.position = Vector3.Lerp(item.transform.position, targetWorldPos, Time.deltaTime * moveLerp);
+            }
+
+            // (선택) 회전 동기화는 현재 데이터에 없으므로 생략됨.
+            // 필요하다면 ItemPoseMsg에 rx, ry, rz 등을 추가해야 함.
         }
     }
+
 
     // ===== 6. 원격 에이전트 클래스 (위치 보간) =====
     private class RemoteAgent
