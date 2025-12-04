@@ -776,6 +776,7 @@ public class NetworkPlayerSync : MonoBehaviour
         }
     }
 
+    //
     private void ApplyItemSnapshot(ItemPayload[] items)
     {
         // 룸 앵커 확인
