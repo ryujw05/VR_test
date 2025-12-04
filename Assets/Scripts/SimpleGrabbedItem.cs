@@ -113,11 +113,17 @@ public class SimpleGrabbedItem : MonoBehaviour
             // 1. 위치 이동 (기존 코드)
             transform.position = roomAnchor.position + Vector3.up * 0.5f; // 바닥보다 0.5m 위에서 떨어지게
             transform.rotation = roomAnchor.rotation;
+
+            // [수정 2] ★핵심★ 앵커를 부모로 설정 (AR 좌표 보정 시 같이 따라가도록)
+            transform.SetParent(roomAnchor, true);
+
             NetworkPlayerSync.Instance.CustomLog($"[SUMMON] {itemId} to Anchor!");
         }
         else
         {
             transform.position = Vector3.up * 0.5f; // 월드 기준
+            // 앵커가 없으면 부모 해제
+            transform.SetParent(null);
         }
 
         // 2. 물리 초기화
