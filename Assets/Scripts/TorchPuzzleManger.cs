@@ -7,13 +7,25 @@ public class TorchPuzzleManager : MonoBehaviour
     public TorchHole[] torchHoles;
     public GameObject secondClearObject;
 
-    private bool cleared;
+    public GameObject[] appearObjects;
 
-    private void Awake()
+    bool cleared;
+
+    void Awake()
     {
         Instance = this;
+
         if (secondClearObject != null)
             secondClearObject.SetActive(true);
+
+        if (appearObjects != null)
+        {
+            foreach (var obj in appearObjects)
+            {
+                if (obj != null)
+                    obj.SetActive(false);
+            }
+        }
     }
 
     public void CheckClear()
@@ -31,5 +43,14 @@ public class TorchPuzzleManager : MonoBehaviour
 
         if (secondClearObject != null)
             secondClearObject.SetActive(false);
+
+        if (appearObjects != null)
+        {
+            foreach (var obj in appearObjects)
+            {
+                if (obj != null)
+                    obj.SetActive(true);
+            }
+        }
     }
 }

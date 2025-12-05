@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
 using UnityEngine.XR.ARFoundation;
+using UnityEngine.SceneManagement;
 
 public class FloorRoomStateMachine : MonoBehaviour
 {
@@ -14,6 +15,7 @@ public class FloorRoomStateMachine : MonoBehaviour
     public TMP_Text debugText;           // Realtime debug (xyz + rot)
     public Material roomMaterial;        // Visual material (transparent recommended)
     public ARAnchorManager anchorManager;// XR Origin에 붙은 ARAnchorManager
+    public string mapSceneName = "Map";
 
     [Header("AR Plane")]
     [SerializeField] private ARPlaneManager planeManager;
@@ -152,6 +154,11 @@ public class FloorRoomStateMachine : MonoBehaviour
 
         // ▼ 1프레임 뒤에 NPS 보정→동기화 시작 (타이밍 안정화)
         StartCoroutine(_AfterLockWireUp());
+
+        if (roomAnchorTr != null)
+        {
+            StartCoroutine(LoadMapAdditive(roomAnchorTr));
+        }
     }
 
     private IEnumerator _AfterLockWireUp()
@@ -341,5 +348,38 @@ public class FloorRoomStateMachine : MonoBehaviour
         return false;
     }
 
+    private IEnumerator LoadMapAdditive(Transform roomAnchor)
+    {
+        // 1) Map 씬 Additive 로드
+        var op = SceneManager.LoadSceneAsync(mapSceneName, LoadSceneMode.Additive);
+        yield return op;
+
+        // 2) Map 씬 핸들 가져오기
+        Scene mapScene = SceneManager.GetSceneByName(mapSceneName);
+        if (!mapScene.IsValid())
+        {
+            Debug.LogError($"Map scene '{mapSceneName}' not found or not valid.");
+            yield break;
+        }
+
+        // 3) 루트 오브젝트들 가져오기
+        var roots = mapScene.GetRootGameObjects();
+        if (roots == null || roots.Length == 0)
+        {
+            Debug.LogWarning("Map scene has no root GameObjects.");
+            yield break;
+        }
+
+        // 4) 모두 RoomAnchor 밑으로 붙이기
+        foreach (var go in roots)
+        {
+            // 카메라/이벤트시스템 같은 건 건너뛰고 싶으면 여기서 필터 가능
+            // if (go.GetComponent<Camera>() != null) continue;
+
+            go.transform.SetParent(roomAnchor, false);
+        }
+
+        Debug.Log("Map scene loaded and attached under RoomAnchor.");
+    }
 
 }
