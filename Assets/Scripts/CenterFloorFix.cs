@@ -119,40 +119,41 @@ public class FloorRoomStateMachine : MonoBehaviour
     {
         if (stage != Stage.AwaitConfirm || !arCamera) return;
 
-        // Lock floor center at confirm
         Vector3 camPos = arCamera.transform.position;
-        //float floorY = camPos.y - Mathf.Clamp(cameraLensOffset, 0f, 0.05f);
-        //lockedCenter = new Vector3(camPos.x, floorY, camPos.z);
+
         float floorY;
         if (!TryGetFloorY(out floorY))
         {
-            // 실패하면 fallback으로 옛날 방식 쓰거나, 메시지 띄우고 return
             floorY = camPos.y - Mathf.Clamp(cameraLensOffset, 0f, 0.05f);
         }
 
         lockedCenter = new Vector3(camPos.x, floorY, camPos.z);
-
-        // Lock yaw
         lockedYawDeg = arCamera.transform.eulerAngles.y;
 
-        // Create cube under an Anchor
         CreateLockedRoom();
 
         stage = Stage.Locked;
         if (messageText) messageText.text = "Game room fixed.";
         if (confirmButton) confirmButton.interactable = false;
 
-        // ▼ 방금 생성한 RoomAnchor Transform 얻기 (네 프로젝트에 맞게)
+        // ▼ 방금 생성된 RoomAnchor Transform
         Transform roomAnchorTr = GameObject.Find("RoomAnchor")?.transform;
 
-        // ▼ RPS에 "바로 그" roomRef를 주입
+        // ▼ RPS에 roomRef 주입
         if (rps == null) rps = FindObjectOfType<RoomPoseDisplay>();
         if (rps != null && roomAnchorTr != null)
             rps.SetRoomRef(roomAnchorTr);
 
-        // ▼ 1프레임 뒤에 NPS 보정→동기화 시작 (타이밍 안정화)
+        // ▼ NPS 보정
         StartCoroutine(_AfterLockWireUp());
+
+        // ▼ ★★ 추가: 보정 완료 이벤트 발행 (Map 로더가 여기 연결됨)
+        if (onRoomFixed != null && roomAnchorTr != null)
+        {
+            onRoomFixed.Invoke(roomAnchorTr);
+        }
     }
+
 
     private IEnumerator _AfterLockWireUp()
     {
@@ -189,18 +190,24 @@ public class FloorRoomStateMachine : MonoBehaviour
 
     void CreateLockedRoom()
     {
+        // 기존에 있던 디버그 룸/앵커 정리
         if (roomCube) Destroy(roomCube);
         if (roomAnchor) Destroy(roomAnchor.gameObject);
 
-        // Create an anchor GameObject at the cube center (so cube bottom sits on floor)
+        // 1) RoomAnchor만 생성 (좌표계 기준점)
         GameObject anchorGO = new GameObject("RoomAnchor");
+
+        // 방의 중심(lockedCenter)을 기준으로, 방 높이의 절반만큼 올린 위치에 앵커 배치
+        // (이 로직은 그대로 두어도 됨. 나중에 Map 씬 붙일 때 이 Anchor 기준으 맞출 거라서)
         anchorGO.transform.position = new Vector3(
             lockedCenter.x,
-            lockedCenter.y + (roomSizeMeters * 0.5f),
+            lockedCenter.y,   // ★ 그냥 바닥 높이에 둔다
             lockedCenter.z
         );
+
         anchorGO.transform.rotation = Quaternion.Euler(0f, lockedYawDeg, 0f);
 
+        // 2) ARAnchor 붙이기 (트래킹 리셋에도 버티게)
         if (anchorManager)
         {
             roomAnchor = anchorGO.AddComponent<ARAnchor>();
@@ -210,20 +217,13 @@ public class FloorRoomStateMachine : MonoBehaviour
             Debug.LogWarning("ARAnchorManager not found. The room may jump on tracking reset.");
         }
 
-        // Create the cube as a child of the anchor (so it survives origin resets)
-        roomCube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        roomCube.name = "GameRoom";
-        roomCube.transform.SetParent(anchorGO.transform, false);
-        roomCube.transform.localScale = Vector3.one * roomSizeMeters;
-
-        if (roomMaterial)
-        {
-            var mr = roomCube.GetComponent<MeshRenderer>();
-            if (mr) mr.material = roomMaterial;
-        }
-
-        BuildCubeEdges(roomCube.transform, roomSizeMeters, Color.red, 0.005f);
+        // 3) 디버그용 GameRoom / FloorPlate / CubeEdges 는 STEP1에서 완전히 제거
+        //    - roomCube를 새로 만들지 않음
+        //    - FloorPlate도 만들지 않음
+        //    - BuildCubeEdges도 호출하지 않음
+        roomCube = null;
     }
+
 
     // 정육면체 모서리선 생성기
     private void BuildCubeEdges(Transform cube, float size, Color color, float width = 0.01f)

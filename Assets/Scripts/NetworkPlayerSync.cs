@@ -8,8 +8,9 @@ using WS = WebSocketSharp;
 
 public class NetworkPlayerSync : MonoBehaviour
 {
+    public static NetworkPlayerSync Instance;
     [Header("Connection")]
-    public string serverWsUrl = "ws://192.168.219.102:8080/ws";
+    public string serverWsUrl = "ws://192.168.219.101:8080/ws";
     [HideInInspector]
     public string myId = "";
 
@@ -69,8 +70,8 @@ public class NetworkPlayerSync : MonoBehaviour
     private bool hasCVR = false; // 보정 완료 플래그
 
     private Transform localAvatarTr;
-    private bool cLog = true;
-    private bool xLog = false;
+    private bool cLog = false;
+    private bool xLog = true;
 
     // ★ 추가: PlayerPrefs 키
     const string PREF_PID = "nps.player";  // ex) "p1"
@@ -82,11 +83,11 @@ public class NetworkPlayerSync : MonoBehaviour
     private readonly HashSet<string> _occupiedItemIds = new();
 
     // JSON 직렬화를 위한 클래스
-    [Serializable] class Coordinate { public float x; public float z; }
+    [Serializable] class Coordinate { public float x; public float z; public float r; }
     [Serializable] public class Hand { public float x, y, z; public Hand() { } public Hand(Vector3 v) { x = v.x; y = v.y; z = v.z; } }
     [Serializable] class CoordinateWrap { public Coordinate coordinate; public Hand hand; public string grabbedItemId; }
 
-    [Serializable] public class PlayerData { public string id; public float x; public float z; public Hand hand; public string grabbedItemId; } // hand 추가
+    [Serializable] public class PlayerData { public string id; public float x; public float z; public float r; public Hand hand; public string grabbedItemId; } // hand 추가
     [Serializable] public class PlayersRoot { public PlayerData[] players; }
 
     [Serializable] class FirstReply { public string player; public string id; }
@@ -110,12 +111,26 @@ public class NetworkPlayerSync : MonoBehaviour
     public class ServerSnapshot
     {
         public PlayerData[] players;
-        public Dictionary<string, ItemPayload> items;
+        public ItemPayload[] items;
     }
 
+    // ★ [추가 2] 인스턴스 초기화
+    private void Awake()
+    {
+        if (Instance == null)
+        {
+            Instance = this;
+        }
+        else
+        {
+            // 중복 생성 방지 (혹시 모를 상황 대비)
+            Destroy(gameObject);
+            return;
+        }
+    }
 
     // UI에 로그를 출력하는 헬퍼 함수
-    private void CustomLog(string message)
+    public void CustomLog(string message)
     {
         Debug.Log(message);
         string time = DateTime.Now.ToString("HH:mm:ss");
@@ -134,7 +149,7 @@ public class NetworkPlayerSync : MonoBehaviour
     private void Start()
     {
         if (!localPlayer) localPlayer = transform;
-        CustomLog("[System] NetworkPlayerSync Initialized. Auto-connecting...");
+        CustomLog("[System] NetworkPlayerSyncSingleton Ready.");
 
         // Start에서 연결 시작
         ConnectToServer(null);
@@ -419,19 +434,29 @@ public class NetworkPlayerSync : MonoBehaviour
         }
 
         Vector3 localPos;
+        float localYaw;
         if (poseProvider != null && poseProvider.HasRoomLock)   // Fix 이후만 true
         {
             var xz = poseProvider.RoomXZ;                       // room-space XZ
+
+            // 2. 회전(Yaw) 계산 [추가]
+            float roomYaw = poseProvider.RoomYawDeg;
+
             if (useCVR)
             {
                 if (!hasCVR) { if (cLog) CustomLog("[CVR] Skip send: not calibrated."); return; }
                 // p_cvr = R(−ψ) * (p_local − O) * s
                 Vector2 cvr = Rot2D((xz - cvrOriginXZ) * cvrScale, -cvrYawRad);
                 localPos = new Vector3(cvr.x, 0f, cvr.y);
+
+                // 회전 변환 [추가]
+                // CVR 각도 = 로컬 각도 - 보정 각도(Rad -> Deg 변환 필요)
+                localYaw = roomYaw - (cvrYawRad * Mathf.Rad2Deg) - 90f;
             }
             else
             {
                 localPos = new Vector3(xz.x, 0f, xz.y); // 기존 로컬 그대로
+                localYaw = roomYaw; // [추가] CVR 안쓰면 그대로
             }
         }
         else
@@ -473,7 +498,7 @@ public class NetworkPlayerSync : MonoBehaviour
 
         var wrap = new CoordinateWrap
         {
-            coordinate = new Coordinate { x = localPos.x, z = localPos.z },
+            coordinate = new Coordinate { x = localPos.x, z = localPos.z, r = localYaw },
             hand = handOut.HasValue ? new Hand(handOut.Value) : null,
             grabbedItemId = string.IsNullOrEmpty(currentGrabbedItemId) ? null : currentGrabbedItemId
         };
@@ -504,17 +529,40 @@ public class NetworkPlayerSync : MonoBehaviour
 
             bool isOwner = item.isLocallyGrabbed || v2 >= restThreshold;
 
+            if (xLog) CustomLog($"[ITEM SEND DEBUG] ID: {currentGrabbedItemId}, IsOwner: {isOwner}, LocalGrab: {item.isLocallyGrabbed}, Vel: {v2}");
+
             if (isOwner)
             {
-                // 2) 현재 아이템 좌표를 서버로 보고
-                Vector3 ipos = item.transform.position;
+                // 2) 좌표 변환: World -> Room Local -> CVR (공통 좌표)
+                Vector3 finalPos = item.transform.position;
+                if (poseProvider != null && poseProvider.HasRoomLock)
+                {
+                    // A. Room Local로 변환
+                    Vector3 roomPos = poseProvider.GetRoomAnchor().InverseTransformPoint(item.transform.position);
+
+                    // B. CVR 사용 시 공통 좌표로 변환
+                    if (useCVR && hasCVR)
+                    {
+                        Vector2 roomXZ = new Vector2(roomPos.x, roomPos.z);
+                        // 회전(-ψ) 및 스케일 적용 (플레이어와 동일한 로직)
+                        Vector2 cvrXZ = Rot2D((roomXZ - cvrOriginXZ) * cvrScale, -cvrYawRad);
+
+                        // y(높이)는 그대로 사용하거나 필요시 보정 (여기선 그대로)
+                        finalPos = new Vector3(cvrXZ.x, roomPos.y, cvrXZ.y);
+                    }
+                    else
+                    {
+                        // CVR 안 쓰면 Room Local 그대로 전송
+                        finalPos = roomPos;
+                    }
+                }
 
                 ItemPoseMsg m = new ItemPoseMsg
                 {
                     id = currentGrabbedItemId,
-                    px = ipos.x,
-                    py = ipos.y,
-                    pz = ipos.z
+                    px = finalPos.x,
+                    py = finalPos.y, // 높이
+                    pz = finalPos.z
                 };
 
                 string poseJson = JsonUtility.ToJson(m);
@@ -534,6 +582,7 @@ public class NetworkPlayerSync : MonoBehaviour
                 // 3) 속도가 충분히 작으면 "멈췄다"고 보고 소유권 해제
                 if (cLog) CustomLog($"[ITEM REST] item={currentGrabbedItemId} at rest → release ownership");
                 currentGrabbedItemId = "";
+                if (xLog) CustomLog($"[ITEM ERROR] currentGrabbedItemId is '{currentGrabbedItemId}' but TryGet failed!");
             }
         }
     }
@@ -544,11 +593,27 @@ public class NetworkPlayerSync : MonoBehaviour
         var seen = new HashSet<string>();
         _occupiedItemIds.Clear();
 
+        // ★ [추가] 룸 앵커 가져오기 (앵커 없으면 아직 그릴 수 없음)
+        Transform roomAnchor = null;
+        if (poseProvider != null)
+        {
+            roomAnchor = poseProvider.GetRoomAnchor(); // 아까 RPD에 추가한 함수 호출
+        }
+        if (roomAnchor == null) return; // 앵커 없으면 중단 (안전장치)
+
         foreach (var p in players)
         {
             if (cLog) CustomLog($"[SYNC] Processing ID: {p.id}. My ID is {myId}.");
 
             if (string.IsNullOrEmpty(p.id)) continue;
+
+            // [추가된 부분] 내 아이디(myId)라면 렌더링 로직 건너뛰기
+            // renderSelfFromServer가 false(기본값)라면 내 아바타는 생성/갱신하지 않음
+            if (p.id == myId && !renderSelfFromServer)
+            {
+                continue;
+            }
+
             seen.Add(p.id);
 
             if (cLog)
@@ -559,41 +624,81 @@ public class NetworkPlayerSync : MonoBehaviour
 
             // body
             Vector3 world = new Vector3(p.x, 0f, p.z);
-            Quaternion rot = Quaternion.identity;
+            Vector3 localPosBody;
+            Quaternion localRotBody;
 
-            // 손 위치 (서버에서 hand 필드로 오는 값 그대로 사용)
+            // CVR을 쓴다면: [CVR -> Room] 역변환 필요
+            if (useCVR && hasCVR)
+            {
+                // 보낼 때: (Room - Origin) * Scale -> 회전(-Angle)
+                // 받을 때: 회전(+Angle) -> 나누기 Scale -> 더하기 Origin
+                Vector2 cvrXZ = new Vector2(p.x, p.z);
+                Vector2 roomXZ = Rot2D(cvrXZ, cvrYawRad) / cvrScale + cvrOriginXZ; // +cvrYawRad (부호 반대)
+
+                localPosBody = new Vector3(roomXZ.x, 0f, roomXZ.y);
+
+                // 2. 회전 역변환 [추가]
+                // 받은 각도(p.r)에 보정 각도(cvrYawRad)를 더해줍니다.
+                float restoredYaw = p.r + (cvrYawRad * Mathf.Rad2Deg);
+                localRotBody = Quaternion.Euler(0f, restoredYaw, 0f);
+            }
+            else
+            {
+                // CVR 안 쓰면 받은 게 곧 룸 로컬 좌표
+                localPosBody = new Vector3(p.x, 0f, p.z);
+                localRotBody = Quaternion.Euler(0f, p.r, 0f); // [추가]
+            }
+
+            Quaternion localRot = Quaternion.identity; // 회전은 일단 기본값
+
+            // 손 좌표 계산
             bool hasHand = (p.hand != null);
-            Vector3 handWorld = Vector3.zero;
-            Quaternion handRot = Quaternion.identity;
+            Vector3 localPosHand = Vector3.zero;
+            Quaternion localRotHand = Quaternion.identity;
 
             if (hasHand)
             {
-                handWorld = new Vector3(p.hand.x, p.hand.y, p.hand.z);
+                if (useCVR && hasCVR)
+                {
+                    // 손도 똑같이 역변환 (높이 y는 그대로)
+                    Vector2 hCvrXZ = new Vector2(p.hand.x, p.hand.z);
+                    Vector2 hRoomXZ = Rot2D(hCvrXZ, cvrYawRad) / cvrScale + cvrOriginXZ;
+                    localPosHand = new Vector3(hRoomXZ.x, p.hand.y, hRoomXZ.y);
+                }
+                else
+                {
+                    localPosHand = new Vector3(p.hand.x, p.hand.y, p.hand.z);
+                }
             }
 
+            //modify
             if (!agents.TryGetValue(p.id, out var agent) || agent == null || agent.tr == null)
             {
                 if (cLog) CustomLog($"[SYNC DEBUG] Creating NEW avatar for ID: {p.id} at World Pos: {world}");
 
+                // 신규 생성: 부모를 roomAnchor로 지정!
                 Transform tr;
                 if (remoteAvatarPrefab)
-                    tr = Instantiate(remoteAvatarPrefab, world, rot).transform;
+                    tr = Instantiate(remoteAvatarPrefab, roomAnchor).transform; // 부모 지정
                 else
                 {
                     GameObject go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                    go.name = $"Remote_{p.id} (Placeholder)";
-                    go.transform.position = world;
-                    go.transform.rotation = rot;
-                    go.transform.localScale = Vector3.one * 0.2f;
+                    go.name = $"Remote_{p.id}";
+                    go.transform.SetParent(roomAnchor, false); // 부모 지정
                     tr = go.transform;
                 }
 
-                //hand prefab
+                // 위치 초기화
+                tr.localPosition = localPosBody;
+                tr.localRotation = localRotBody;
+
                 Transform handTr = null;
                 if (remoteHandPrefab && hasHand)
                 {
-                    handTr = Instantiate(remoteHandPrefab, handWorld, handRot).transform;
+                    handTr = Instantiate(remoteHandPrefab, roomAnchor).transform; // 부모 지정
                     handTr.name = $"Remote_{p.id}_Hand";
+                    handTr.localPosition = localPosHand;
+                    handTr.localRotation = localRotHand;
                 }
 
                 agent = new RemoteAgent(tr, handTr);
@@ -604,13 +709,14 @@ public class NetworkPlayerSync : MonoBehaviour
                 if (cLog) CustomLog($"[SYNC DEBUG] Updating avatar {p.id} to World Pos: {world}");
             }
 
-            agent.targetPos = world;
-            agent.targetRot = rot;
+            // 업데이트: 목표 값을 로컬 좌표로 설정
+            agent.targetLocalPos = localPosBody;
+            agent.targetLocalRot = localRotBody;
 
             if (hasHand)
             {
-                agent.targetHandPos = handWorld;
-                agent.targetHandRot = handRot;
+                agent.targetHandLocalPos = localPosHand;
+                agent.targetHandLocalRot = localRotHand;
             }
 
             if (!string.IsNullOrEmpty(p.grabbedItemId))
@@ -669,25 +775,41 @@ public class NetworkPlayerSync : MonoBehaviour
             }
         }
     }
-
-    private void ApplyItemSnapshot(Dictionary<string, ItemPayload> items)
+    private void ApplyItemSnapshot(ItemPayload[] items)
     {
-        foreach (var kv in items)
+        // 룸 앵커 확인
+        Transform roomAnchor = null;
+        if (poseProvider != null) roomAnchor = poseProvider.GetRoomAnchor();
+        if (roomAnchor == null) return;
+
+        foreach (var data in items)
         {
-            string itemId = kv.Key;
-            var data = kv.Value;
+            string itemId = data.id;
 
-            if (!SimpleGrabbedItem.TryGet(itemId, out var item) || item == null)
-                continue;
+            if (!SimpleGrabbedItem.TryGet(itemId, out var item) || item == null) continue;
 
-            // 1) 내가 로컬로 잡고 있는 아이템이면 (손에 들고 있거나 막 던진 직후)
-            //    → 로컬 물리/손이 위치를 결정하므로 스냅샷으로 덮어쓰지 않음
-            if (item.isLocallyGrabbed || itemId == currentGrabbedItemId)
-                continue;
+            // 내가 잡고 있거나, 내가 던지는 중(오너십 유지)이면 무시
+            if (item.isLocallyGrabbed) continue;
+            if (itemId == currentGrabbedItemId) continue;
 
-            // 2) 그 외(원격 소유 or free 상태)는 그냥 좌표만 맞춰줌
-            //    물리 상태(kinematic/gravity)는 OnRemoteGrabStart/End에서 관리
-            item.transform.position = new Vector3(data.x, data.y, data.z);
+            // 좌표 변환 로직 (기존 유지)
+            Vector3 targetRoomPos;
+            if (useCVR && hasCVR)
+            {
+                Vector2 cvrXZ = new Vector2(data.x, data.z);
+                Vector2 roomXZ = Rot2D(cvrXZ, cvrYawRad) / cvrScale + cvrOriginXZ;
+                targetRoomPos = new Vector3(roomXZ.x, data.y, roomXZ.y);
+            }
+            else
+            {
+                targetRoomPos = new Vector3(data.x, data.y, data.z);
+            }
+
+            Vector3 targetWorldPos = roomAnchor.TransformPoint(targetRoomPos);
+
+            // ★ [수정] 직접 Transform을 건드리지 말고, 아이템 스크립트에 위임
+            // 이렇게 해야 아이템이 스스로 "아, 나 지금 네트워크 조종 당하는구나"라고 알고 물리를 끕니다.
+            item.UpdateRemotePose(targetWorldPos, moveLerp);
         }
     }
 
@@ -698,38 +820,39 @@ public class NetworkPlayerSync : MonoBehaviour
         public Transform tr;
         public Transform handTr;
 
-        public Vector3 targetPos;
-        public Quaternion targetRot;
+        public Vector3 targetLocalPos;
+        public Quaternion targetLocalRot;
 
-        public Vector3 targetHandPos;
-        public Quaternion targetHandRot;
+        public Vector3 targetHandLocalPos;
+        public Quaternion targetHandLocalRot;
 
         public RemoteAgent(Transform t, Transform th)
         {
             tr = t;
-            targetPos = t.position;
-            targetRot = t.rotation;
+            targetLocalPos = t.localPosition;
+            targetLocalRot = t.localRotation;
 
             handTr = th;
 
             if (handTr != null)
             {
-                targetHandPos = handTr.position;
-                targetHandRot = handTr.rotation;
+                targetHandLocalPos = th.localPosition;
+                targetHandLocalRot = th.localRotation;
             }
         }
 
+        //수정됨
         public void Tick(float moveLerp, float rotLerp)
         {
             if (!tr) return;
             float a = 1f - Mathf.Exp(-moveLerp * Time.deltaTime);
             float b = 1f - Mathf.Exp(-rotLerp * Time.deltaTime);
-            tr.position = Vector3.Lerp(tr.position, targetPos, a);
-            tr.rotation = Quaternion.Slerp(tr.rotation, targetRot, b);
+            tr.localPosition = Vector3.Lerp(tr.localPosition, targetLocalPos, a);
+            tr.localRotation = Quaternion.Slerp(tr.localRotation, targetLocalRot, b);
             if (handTr != null)
             {
-                handTr.position = Vector3.Lerp(handTr.position, targetHandPos, a);
-                handTr.rotation = Quaternion.Slerp(handTr.rotation, targetHandRot, b);
+                handTr.localPosition = Vector3.Lerp(handTr.localPosition, targetHandLocalPos, a);
+                handTr.localRotation = Quaternion.Slerp(handTr.localRotation, targetHandLocalRot, b);
             }
         }
     }

@@ -203,6 +203,50 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &334762540
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 334762542}
+  - component: {fileID: 334762541}
+  m_Layer: 0
+  m_Name: MapSceneLoader
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &334762541
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 334762540}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2284ecc670ce63749a9f48e4f5c38d12, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!4 &334762542
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 334762540}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -21.01894, y: -13.416842, z: 1.8399107}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &386739693
 GameObject:
   m_ObjectHideFlags: 0
@@ -232,11 +276,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dc69d545e4f0f3048ba89bba34414ce4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  serverWsUrl: ws://192.168.219.102:8080/ws
+  serverWsUrl: ws://192.168.219.101:8080/ws
   myId: 
   localPlayer: {fileID: 1374127859}
   sharedOrigin: {fileID: 0}
-  remoteAvatarPrefab: {fileID: 7090174630405191453, guid: 3f416f1621e26304c93cf62f51abcb20, type: 3}
+  remoteAvatarPrefab: {fileID: 1403616631470314287, guid: 51b2f7ec556fc154b866ef70b08d955d, type: 3}
   remoteHandPrefab: {fileID: 7090174630405191453, guid: b3250d29b3a0ca84faeb6c2a7bdf1b37, type: 3}
   sendHz: 15
   moveLerp: 12
@@ -1867,7 +1911,7 @@ GameObject:
   - component: {fileID: 1508304291}
   - component: {fileID: 1508304290}
   m_Layer: 5
-  m_Name: connectButton
+  m_Name: SummonButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1917,9 +1961,9 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 386739694}
-        m_TargetAssemblyTypeName: NetworkPlayerSync, Assembly-CSharp
-        m_MethodName: BeginSync
+      - m_Target: {fileID: 9167307963014006537}
+        m_TargetAssemblyTypeName: SimpleGrabbedItem, Assembly-CSharp
+        m_MethodName: SummonToRoomOrigin
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -2361,7 +2405,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1820004673}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -3267,6 +3311,7 @@ MonoBehaviour:
   F1: {fileID: 963490127}
   F2: {fileID: 963490126}
   grab_threshold: 0.05
+  release_threshold: 0.1
   grab_radius: 0.1
   grabbableLayer:
     serializedVersion: 2
@@ -3284,7 +3329,6 @@ GameObject:
   - component: {fileID: 2244396728658889786}
   - component: {fileID: 8161402102339364611}
   - component: {fileID: 7445866151012006115}
-  - component: {fileID: 9167307963014006538}
   - component: {fileID: 9167307963014006537}
   m_Layer: 6
   m_Name: Cube 1
@@ -3332,7 +3376,7 @@ Rigidbody:
   m_ImplicitTensor: 1
   m_UseGravity: 0
   m_IsKinematic: 1
-  m_Interpolate: 0
+  m_Interpolate: 1
   m_Constraints: 0
   m_CollisionDetection: 0
 --- !u!65 &8161402102339364611
@@ -3411,36 +3455,6 @@ MonoBehaviour:
   rb: {fileID: 0}
   isLocallyGrabbed: 0
   isRemotelyGrabbed: 0
---- !u!114 &9167307963014006538
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4124183347678237743}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dc69d545e4f0f3048ba89bba34414ce4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  serverWsUrl: ws://192.168.219.102:8080/ws
-  myId: 
-  localPlayer: {fileID: 0}
-  sharedOrigin: {fileID: 0}
-  remoteAvatarPrefab: {fileID: 0}
-  remoteHandPrefab: {fileID: 0}
-  sendHz: 15
-  moveLerp: 12
-  rotLerp: 12
-  minDeltaToSend: 0.01
-  useCVR: 1
-  requireCalibToSync: 1
-  renderSelfFromServer: 0
-  handProvider: {fileID: 0}
-  includeHand: 1
-  debugLogText: {fileID: 0}
-  currentGrabbedItemId: 
-  poseProvider: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -3462,3 +3476,4 @@ SceneRoots:
   - {fileID: 2091382237}
   - {fileID: 1320997293}
   - {fileID: 9167307963014006536}
+  - {fileID: 334762542}
