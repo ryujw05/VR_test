@@ -52,9 +52,13 @@ public class MapSceneLoader : MonoBehaviour
 
         if (mapRoot == null || currentRoomAnchor == null) yield break;
 
-        mapRoot.transform.SetParent(currentRoomAnchor, false);
+        // mapRoot.transform.SetParent(currentRoomAnchor, false);
+        mapRoot.transform.SetParent(null); 
+        mapRoot.transform.position = currentRoomAnchor.position;
+        mapRoot.transform.rotation = currentRoomAnchor.rotation;
         mapRoot.transform.localPosition = Vector3.zero;
         mapRoot.transform.localRotation = Quaternion.identity;
         mapRoot.transform.localScale = Vector3.one;
+        Physics.SyncTransforms();
     }
 }
