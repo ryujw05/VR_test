@@ -59,6 +59,5 @@ public class MapSceneLoader : MonoBehaviour
         mapRoot.transform.localPosition = Vector3.zero;
         mapRoot.transform.localRotation = Quaternion.identity;
         mapRoot.transform.localScale = Vector3.one;
-        Physics.SyncTransforms();
     }
 }
